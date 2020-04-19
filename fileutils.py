@@ -10,11 +10,11 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-training_path = 'D:/training-data-very-simple-ss/'
+training_path = 'D:/training-data-relative-pos-with-obstacle/'
 temp_path = './.temp/'
 
 lr=0.0001
-batch_size = 32
+batch_size = 16
 sequence_length = 36
 w, h = 128, 128
 zip_files = list(glob.glob(training_path + "*.zip"))

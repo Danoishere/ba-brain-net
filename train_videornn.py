@@ -9,7 +9,7 @@ import numpy as np
 import net
 from net import Query
 import matplotlib.pyplot as plt
-from random import shuffle
+from random import shuffle, randint
 from autoencoder import ConvAutoencoder
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
@@ -23,7 +23,7 @@ def train_video_rnn(queue, lock, load_model=True):
     writer = SummaryWriter('tensorboard/train' + current_time, flush_secs=10)
 
     lr=0.0001
-    batch_size = 32
+    batch_size = 16
     sequence_length = 36
     w, h = 128, 128
     colors = ["red", "green", "blue", "yellow", "white", "grey", "purple"]
@@ -45,15 +45,15 @@ def train_video_rnn(queue, lock, load_model=True):
     colnet.load_state_dict(torch.load('colnet-model-csipo.mdl'))
     colnet.train()
     
-    
-    # cae.requires_grad = False
+    vnet.requires_grad = False
+    cae.requires_grad = False
 
     col_citerion = nn.CrossEntropyLoss().cuda()
     pos_criterion = nn.MSELoss().cuda()
 
     params = []
-    params += list(cae.parameters())
-    params += list(vnet.parameters())
+    # params += list(cae.parameters())
+    # params += list(vnet.parameters())
     params += list(colnet.parameters())
     params += list(posnet.parameters())
 
@@ -70,15 +70,17 @@ def train_video_rnn(queue, lock, load_model=True):
         optimizer.zero_grad()
         vnet.init_hidden()
 
-        skip = 4
+        skip = 2
+        last_frame = 0
         # Pass batch frame by frame
-        for frame in range(int(sequence_length/skip)):
+        for frame in range(int(sequence_length/skip) - randint(0,8)):
             # Dimensionen batch_x
             # (frame-nr (36), batch-nr, color, height, width)
             frame_input = torch.tensor(batch_x[int(frame*skip)], requires_grad=True).float().cuda()
             encoded = cae.encode(frame_input)
             encoded = encoded.reshape(batch_size, -1)
             output = vnet(encoded)
+            last_frame = frame
 
         tot_loss_pos = torch.tensor(0.0).cuda()
         tot_loss_col = torch.tensor(0.0).cuda()
@@ -90,6 +92,7 @@ def train_video_rnn(queue, lock, load_model=True):
 
             # Predict color, based on location
             y_target_pos = []
+            y_target_rel_pos = []
             obj_col_onehots = []
             obj_col_indices = []
             obj_shape_onehots = []
@@ -98,8 +101,13 @@ def train_video_rnn(queue, lock, load_model=True):
 
             for scene in scenes:
                 scene_objects = scene["objects"]
+                last_frame_transf_mat = np.array(scene["cam_base_matricies"][last_frame])
+                last_frame_transf_mat_inv = np.linalg.inv(last_frame_transf_mat)
+
                 rnd_obj = np.random.choice(list(scene_objects.keys()))
                 obj_pos = scene_objects[rnd_obj]['pos']
+                obj_rel_pos = last_frame_transf_mat_inv @ np.array(obj_pos + [1])
+                obj_rel_pos = obj_rel_pos[:3]
                 obj_col_idx = colors.index(scene_objects[rnd_obj]['color-name'])
                 obj_shape_idx = shapes.index(rnd_obj.split("-")[0])
 
@@ -109,33 +117,26 @@ def train_video_rnn(queue, lock, load_model=True):
                 obj_shape_oh[obj_shape_idx] = 1.0
 
                 y_target_pos.append(obj_pos)
+                y_target_rel_pos.append(obj_rel_pos)
                 obj_col_onehots.append(obj_col_oh)
                 obj_shape_onehots.append(obj_shape_oh)
                 obj_col_indices.append(obj_col_idx)
 
-                scene_cam_pos = []
-                for cam_pos_frame in scene["cam_positions"]:
-                    scene_cam_pos.append(cam_pos_frame)
-
-                all_cam_pos.append(scene_cam_pos)
-
-
-            x_all_cam_pos = np.asarray(all_cam_pos)
-            x_all_cam_pos = np.swapaxes(x_all_cam_pos, 0,1)
 
             # oh = one-hot
             y_col_oh = torch.tensor(obj_col_onehots, requires_grad=True, dtype=torch.float32).cuda()
             y_shape_oh = torch.tensor(obj_shape_onehots, requires_grad=True, dtype=torch.float32).cuda()
-            y_target_pos_t = torch.tensor(y_target_pos).cuda()
+            y_target_pos_t = torch.tensor(y_target_pos).float().cuda()
+            y_target_rel_pos_t = torch.tensor(y_target_rel_pos).float().cuda()
 
             # Find position loss
             y_pred_pos = posnet(output, y_shape_oh, y_col_oh)
-            loss_pos = euclidean_distance_loss(y_pred_pos, y_target_pos_t)
+            loss_pos = euclidean_distance_loss(y_pred_pos, y_target_rel_pos_t)
             tot_loss_pos += loss_pos
 
             # Find color loss
             y_col_idx = torch.tensor(obj_col_indices, dtype=torch.long).cuda()
-            y_pred_col = colnet(output, y_target_pos_t)
+            y_pred_col = colnet(output, y_target_rel_pos_t)
             loss_col = col_citerion(y_pred_col, y_col_idx)
 
             tot_loss_col += loss_col
@@ -166,10 +167,7 @@ def train_video_rnn(queue, lock, load_model=True):
     plt.show()
 
 def euclidean_distance_loss(y_pred_pos, y_target_pos_t):
-
-
     # sqrt(x^2 + y^2 + z^2)
-
     diff = y_pred_pos - y_target_pos_t
     diff_squared = diff**2
     diff_sum = torch.sum(diff_squared, dim=1)

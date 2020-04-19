@@ -6,7 +6,7 @@ class Query(Enum):
     POS = 1
     COL = 2
 
-batch_size = 32
+batch_size = 16
 
 class Net(nn.Module):
     def __init__(self):
@@ -14,7 +14,6 @@ class Net(nn.Module):
         self.hidden_dim = 2048
         self.n_layers = 1
         self.rnn = nn.LSTM(2048, self.hidden_dim, self.n_layers)
-
 
 
     def init_hidden(self):
@@ -31,22 +30,6 @@ class Net(nn.Module):
         self.hidden = hidden
         out = out.reshape(batch_size, -1)
         return out
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # 5 shapes, 7 colors
@@ -68,7 +51,6 @@ class PosNet(nn.Module):
         self.fc_i3 = nn.Linear(64, 256)
 
     def forward(self, out,  shape, col):
-
         inp = torch.cat((shape, col), 1)
         inp = self.fc_i1(inp)
         inp = self.lrelu(inp)
