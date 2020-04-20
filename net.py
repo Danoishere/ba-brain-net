@@ -1,16 +1,17 @@
 import torch
 import torch.nn as nn
 from enum import Enum
+import config
 
 class Query(Enum):
     POS = 1
     COL = 2
 
-batch_size = 16
+batch_size = config.batch_size
 
-class Net(nn.Module):
+class VisionNet(nn.Module):
     def __init__(self):
-        super(Net, self).__init__()
+        super(VisionNet, self).__init__()
         self.hidden_dim = 2048
         self.n_layers = 1
         self.rnn = nn.LSTM(2048, self.hidden_dim, self.n_layers)
@@ -31,64 +32,112 @@ class Net(nn.Module):
         out = out.reshape(batch_size, -1)
         return out
 
-
-# 5 shapes, 7 colors
-# 200 + 12
-class PosNet(nn.Module):
+# WHAT
+class VentralNet(nn.Module):
     def __init__(self):
-        super(PosNet, self).__init__()
+        super(VentralNet, self).__init__()
         self.lrelu = nn.LeakyReLU()
-        self.fc1 = nn.Linear(2048 + 256, 1024)
-        self.fc2 = nn.Linear(1024, 1024)
-        self.fc3 = nn.Linear(1024, 1024)
-        self.fc4 = nn.Linear(1024, 1024)
-        self.fc5 = nn.Linear(1024, 512)
-        self.fc6 = nn.Linear(512, 64)
-        self.fc7 = nn.Linear(64, 3)
+        self.fc1 = nn.Linear(2048, 1024)
+        self.fc2 = nn.Linear(1024, 512)
+        self.fc3 = nn.Linear(512, 512)
 
-        self.fc_i1 = nn.Linear(12, 24)
-        self.fc_i2 = nn.Linear(24, 64)
-        self.fc_i3 = nn.Linear(64, 256)
-
-    def forward(self, out,  shape, col):
-        inp = torch.cat((shape, col), 1)
-        inp = self.fc_i1(inp)
-        inp = self.lrelu(inp)
-        inp = self.fc_i2(inp)
-        inp = self.lrelu(inp)
-        inp = self.fc_i3(inp)
-        inp = self.lrelu(inp)
-
-        out = torch.cat((out, inp), 1)
+    def forward(self, v1_out):
+        out = self.lrelu(v1_out)
         out = self.fc1(out)
         out = self.lrelu(out)
         out = self.fc2(out)
         out = self.lrelu(out)
         out = self.fc3(out)
+        return out
+
+# WHERE
+class DorsalNet(nn.Module):
+    def __init__(self):
+        super(DorsalNet, self).__init__()
+        self.lrelu = nn.LeakyReLU()
+        self.fc1 = nn.Linear(2048, 1024)
+        self.fc2 = nn.Linear(1024, 512)
+        self.fc3 = nn.Linear(512, 512)
+
+    def forward(self, v1_out):
+        out = self.lrelu(v1_out)
+        out = self.fc1(out)
+        out = self.lrelu(out)
+        out = self.fc2(out)
+        out = self.lrelu(out)
+        out = self.fc3(out)
+        return out
+
+# (vent_in, dors_in, shape, col) -> pos
+class ClassToPosNet(nn.Module):
+    def __init__(self):
+        super(ClassToPosNet, self).__init__()
+        self.lrelu = nn.LeakyReLU()
+        self.fc1 = nn.Linear(512 + 512, 1024)
+        self.fc2 = nn.Linear(1024, 1024)
+        self.fc3 = nn.Linear(1024 + 256, 1024)
+        self.fc4 = nn.Linear(1024, 64)
+        self.fc5 = nn.Linear(64, 3)
+
+        self.side_fc1 = nn.Linear(12, 64)
+        self.side_fc2 = nn.Linear(64, 256)
+        self.side_fc3 = nn.Linear(256, 256)
+
+
+    def forward(self, vent_in, dors_in, shape, col):
+
+        side = torch.cat((shape, col), 1)
+        side = self.side_fc1(side)
+        side = self.lrelu(side)
+        side = self.side_fc2(side)
+        side = self.lrelu(side)
+        side = self.side_fc3(side)
+        side = self.lrelu(side)
+
+
+        out = torch.cat((vent_in, dors_in), 1)
+        out = self.fc1(out)
+        out = self.lrelu(out)
+        out = self.fc2(out)
+        out = self.lrelu(out)
+
+        out = torch.cat((out, side), 1)
+        out = self.fc3(out)
         out = self.lrelu(out)
         out = self.fc4(out)
         out = self.lrelu(out)
         out = self.fc5(out)
-        out = self.lrelu(out)
-        out = self.fc6(out)
-        out = self.lrelu(out)
-        out = self.fc7(out)
+
+
         return out
 
-# Pos in col out
-class ColNet(nn.Module):
+
+    def loss(self, y_pred_pos, y_target_pos_t):
+        # euclidean loss
+        # sqrt(x^2 + y^2 + z^2)
+        diff = torch.sum((y_pred_pos - y_target_pos_t)**2, dim=1)
+        diff_sum_sqrt = torch.sqrt(diff)
+        loss_pos = torch.mean(diff_sum_sqrt)
+        return loss_pos
+
+# (vent_in, dors_in, pos) -> (col, shape)
+class PosToClass(nn.Module):
     def __init__(self):
-        super(ColNet, self).__init__()
-        self.fc1 = nn.Linear(2048 + 3, 1024)
-        self.fc2 = nn.Linear(1024, 1024)
-        self.fc3 = nn.Linear(1024, 512)
+        super(PosToClass, self).__init__()
+        self.col_criterion = nn.CrossEntropyLoss().cuda()
+        self.shape_criterion = nn.CrossEntropyLoss().cuda()
+
+        self.fc1 = nn.Linear(512 + 512 + 3, 512)
+        self.fc2 = nn.Linear(512, 512)
+        self.fc3 = nn.Linear(512, 512)
         self.fc4 = nn.Linear(512, 64)
-        self.fc5 = nn.Linear(64, 10)
-        self.fc6 = nn.Linear(10, 7)
+
+        self.logits_col = nn.Linear(64, 7)
+        self.logits_shape = nn.Linear(64, 5)
 
     # give position, receive color
-    def forward(self, state, pos):
-        out = torch.cat((state, pos), 1)
+    def forward(self, vent_in, dors_in, pos):
+        out = torch.cat((vent_in, dors_in, pos), 1)
         out = self.fc1(out)
         out = torch.relu(out)
         out = self.fc2(out)
@@ -97,21 +146,83 @@ class ColNet(nn.Module):
         out = torch.relu(out)
         out = self.fc4(out)
         out = torch.relu(out)
-        out = self.fc5(out)
-        out = torch.relu(out)
-        out = self.fc6(out)
-        return out
+        
+        col = self.logits_col(out)
+        shape = self.logits_shape(out)
 
-class GreenNet(nn.Module):
+        return col, shape
+
+    def loss(self, pred_col_logits, pred_shape_logits, target_col_idx, target_shape_idx):
+        col_loss = self.col_criterion(pred_col_logits, target_col_idx)
+        shape_loss = self.shape_criterion(pred_shape_logits, target_shape_idx)
+        total_loss = col_loss + shape_loss
+        return total_loss
+
+# (vent_in, dors_in, uv) -> (col, shape)
+class UVToClass(nn.Module):
     def __init__(self):
-        super(GreenNet, self).__init__()
-        self.fc1 = nn.Linear(100, 20)
-        self.fc2 = nn.Linear(20, 1)
+        super(UVToClass, self).__init__()
+        self.col_criterion = nn.CrossEntropyLoss().cuda()
+        self.shape_criterion = nn.CrossEntropyLoss().cuda()
+
+        self.fc1 = nn.Linear(512 + 512 + 2, 512)
+        self.fc2 = nn.Linear(512, 512)
+        self.fc3 = nn.Linear(512, 512)
+        self.fc4 = nn.Linear(512, 64)
+        self.fc5 = nn.Linear(64, 7)
+        self.fc6 = nn.Linear(64, 5)
 
     # give position, receive color
-    def forward(self, out):
+    def forward(self, vent_in, dors_in, uv):
+        out = torch.cat((vent_in, dors_in, uv), 1)
         out = self.fc1(out)
         out = torch.relu(out)
         out = self.fc2(out)
-        out = out.reshape(batch_size)
-        return out
+        out = torch.relu(out)
+        out = self.fc3(out)
+        out = torch.relu(out)
+        out = self.fc4(out)
+        out = torch.relu(out)
+        
+        col = self.fc5(out)
+        shape = self.fc5(out)
+        return col, shape
+
+    def loss(self, pred_col_logits, pred_shape_logits, target_col_idx, target_shape_idx):
+        col_loss = self.col_criterion(pred_col_logits, target_col_idx)
+        shape_loss = self.shape_criterion(pred_shape_logits, target_shape_idx)
+        total_loss = col_loss + shape_loss
+        return total_loss
+
+"""
+# (dors_in, uv) -> uv
+class UVToPos(nn.Module):
+    def __init__(self):
+        super(UVToPos, self).__init__()
+        self.fc1 = nn.Linear(512 + 2, 512)
+        self.fc2 = nn.Linear(512, 512)
+        self.fc3 = nn.Linear(512, 512)
+        self.fc4 = nn.Linear(512, 64)
+        self.fc5 = nn.Linear(64, 3)
+
+    # give position, receive color
+    def forward(self, state, uv):
+        out = torch.cat((state, uv), 1)
+        out = self.fc1(out)
+        out = torch.relu(out)
+        out = self.fc2(out)
+        out = torch.relu(out)
+        out = self.fc3(out)
+        out = torch.relu(out)
+        out = self.fc4(out)
+        out = torch.relu(out)
+        pos = self.fc5(out)
+        return pos
+
+    def loss(self, y_pred_pos, y_target_pos_t):
+        # sqrt(x^2 + y^2 + z^2)
+        diff = torch.sum((y_pred_pos - y_target_pos_t)**2, dim=1)
+        diff_sum_sqrt = torch.sqrt(diff)
+        loss_pos = torch.mean(diff_sum_sqrt)
+        return loss_pos
+"""

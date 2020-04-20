@@ -13,7 +13,7 @@ from random import shuffle, randint
 from autoencoder import ConvAutoencoder
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
-
+import config
 
 
 def train_video_rnn(queue, lock, load_model=True):
@@ -22,10 +22,11 @@ def train_video_rnn(queue, lock, load_model=True):
     current_time = now.strftime("-%H-%M-%S")
     writer = SummaryWriter('tensorboard/train' + current_time, flush_secs=10)
 
-    lr=0.0001
-    batch_size = 16
-    sequence_length = 36
-    w, h = 128, 128
+    lr=config.lr
+    batch_size = config.batch_size
+    sequence_length = config.sequence_length
+    w, h = config.w, config.h
+
     colors = ["red", "green", "blue", "yellow", "white", "grey", "purple"]
     shapes = ["Cube", "CubeHollow", "Diamond", "Cone", "Cylinder"]
 
@@ -33,57 +34,81 @@ def train_video_rnn(queue, lock, load_model=True):
     cae.load_state_dict(torch.load('cae-model-csipo.mdl'))
     cae.train()
 
-    vnet = net.Net().cuda()
-    vnet.load_state_dict(torch.load('vnet-model-csipo.mdl'))
-    vnet.train()
+    vision_net = net.VisionNet().cuda()
+    vision_net.load_state_dict(torch.load('vnet-model-csipo.mdl'))
+    vision_net.train()
 
-    posnet = net.PosNet().cuda()
-    posnet.load_state_dict(torch.load('posnet-model-csipo.mdl'))
-    posnet.train()
+    ventral_net = net.VentralNet().cuda()
+    ventral_net.load_state_dict(torch.load('ventral-net-csipo.mdl'))
+    ventral_net.train()
 
-    colnet = net.ColNet().cuda()
-    colnet.load_state_dict(torch.load('colnet-model-csipo.mdl'))
-    colnet.train()
-    
-    vnet.requires_grad = False
-    cae.requires_grad = False
+    dorsal_net = net.DorsalNet().cuda()
+    dorsal_net.load_state_dict(torch.load('dorsal-net-csipo.mdl'))
+    dorsal_net.train()
 
-    col_citerion = nn.CrossEntropyLoss().cuda()
-    pos_criterion = nn.MSELoss().cuda()
+    class_to_pos_net = net.ClassToPosNet().cuda()
+    # class_to_pos_net.load_state_dict(torch.load('posnet-model-csipo.mdl'))
+    class_to_pos_net.train()
+
+    pos_to_class_net = net.PosToClass().cuda()
+    pos_to_class_net.load_state_dict(torch.load('colnet-model-csipo.mdl'))
+    pos_to_class_net.train()
+
+    uv_to_class_net = net.UVToClass().cuda()
+    uv_to_class_net.load_state_dict(torch.load('uvtoclass-model-csipo.mdl'))
+    uv_to_class_net.train()
 
     params = []
-    # params += list(cae.parameters())
-    # params += list(vnet.parameters())
-    params += list(colnet.parameters())
-    params += list(posnet.parameters())
+    params += list(cae.parameters())
+    params += list(vision_net.parameters())
+
+    params += list(ventral_net.parameters())
+    params += list(dorsal_net.parameters())
+
+    params += list(class_to_pos_net.parameters())
+    params += list(pos_to_class_net.parameters())
+    params += list(uv_to_class_net.parameters())
+    
 
     optimizer = torch.optim.Adam(params, lr=lr)
     losses = []
     episodes = []
 
     episode = 0
-    num_queries = 16
-    start_train_frames = 2048
+    num_queries = config.num_queries
     while True:
         batch_x, scenes = queue.get()
 
         optimizer.zero_grad()
-        vnet.init_hidden()
+        vision_net.init_hidden()
 
-        skip = 2
+        skip = config.skip_factor
         last_frame = 0
         # Pass batch frame by frame
-        for frame in range(int(sequence_length/skip) - randint(0,8)):
+
+        to_frame = int(sequence_length/skip) - randint(0,int((sequence_length/skip)/4))
+
+
+        selected_frame = randint(0,35)
+
+        # for frame in range(to_frame):
+        for frame in range(selected_frame, selected_frame + 1):
             # Dimensionen batch_x
             # (frame-nr (36), batch-nr, color, height, width)
-            frame_input = torch.tensor(batch_x[int(frame*skip)], requires_grad=True).float().cuda()
+            #frame_input = torch.tensor(batch_x[int(frame*skip)], requires_grad=True).float().cuda()
+            frame_input = torch.tensor(batch_x[frame], requires_grad=True).float().cuda()
             encoded = cae.encode(frame_input)
-            encoded = encoded.reshape(batch_size, -1)
-            output = vnet(encoded)
+            output = encoded.reshape(batch_size, -1)
+            # output = vision_net(encoded)
             last_frame = frame
 
-        tot_loss_pos = torch.tensor(0.0).cuda()
-        tot_loss_col = torch.tensor(0.0).cuda()
+        vent_out = ventral_net(output)
+        dors_out = dorsal_net(output)
+
+        tot_loss_class_to_pos = torch.tensor(0.0).cuda()
+        tot_loss_pos_to_class = torch.tensor(0.0).cuda()
+        tot_loss_uv_to_class = torch.tensor(0.0).cuda()
+
 
         # Sample 10 different objects combinations from each training batch.
         for i in range(num_queries):
@@ -93,21 +118,37 @@ def train_video_rnn(queue, lock, load_model=True):
             # Predict color, based on location
             y_target_pos = []
             y_target_rel_pos = []
+            
+            all_uvs = []
             obj_col_onehots = []
             obj_col_indices = []
+            obj_shape_indices = []
             obj_shape_onehots = []
             all_objs = []
             all_cam_pos = []
 
             for scene in scenes:
                 scene_objects = scene["objects"]
+                rnd_obj = np.random.choice(list(scene_objects.keys()))
+
                 last_frame_transf_mat = np.array(scene["cam_base_matricies"][last_frame])
                 last_frame_transf_mat_inv = np.linalg.inv(last_frame_transf_mat)
 
-                rnd_obj = np.random.choice(list(scene_objects.keys()))
+                last_frame_uv = scene["ss_objs"][last_frame][rnd_obj]
+                all_uvs.append([last_frame_uv["screen_x"], last_frame_uv["screen_y"]])
+                
                 obj_pos = scene_objects[rnd_obj]['pos']
                 obj_rel_pos = last_frame_transf_mat_inv @ np.array(obj_pos + [1])
                 obj_rel_pos = obj_rel_pos[:3]
+
+                """
+                print(obj_rel_pos)
+                print(rnd_obj)
+                img = np.moveaxis(batch_x[last_frame, scenes.index(scene), :3, :, :], 0,2)
+                plt.imshow(img)
+                plt.show()
+                """
+
                 obj_col_idx = colors.index(scene_objects[rnd_obj]['color-name'])
                 obj_shape_idx = shapes.index(rnd_obj.split("-")[0])
 
@@ -121,58 +162,64 @@ def train_video_rnn(queue, lock, load_model=True):
                 obj_col_onehots.append(obj_col_oh)
                 obj_shape_onehots.append(obj_shape_oh)
                 obj_col_indices.append(obj_col_idx)
+                obj_shape_indices.append(obj_shape_idx)
 
 
             # oh = one-hot
             y_col_oh = torch.tensor(obj_col_onehots, requires_grad=True, dtype=torch.float32).cuda()
             y_shape_oh = torch.tensor(obj_shape_onehots, requires_grad=True, dtype=torch.float32).cuda()
-            y_target_pos_t = torch.tensor(y_target_pos).float().cuda()
-            y_target_rel_pos_t = torch.tensor(y_target_rel_pos).float().cuda()
+            y_target_rel_pos_t = torch.tensor(y_target_rel_pos, dtype=torch.float32).cuda()
+            y_col_idx = torch.tensor(obj_col_indices, dtype=torch.long).cuda()
+            y_shape_idx = torch.tensor(obj_shape_indices, dtype=torch.long).cuda()
+            y_uvs = torch.tensor(all_uvs, requires_grad=True, dtype=torch.float32).cuda()
 
             # Find position loss
-            y_pred_pos = posnet(output, y_shape_oh, y_col_oh)
-            loss_pos = euclidean_distance_loss(y_pred_pos, y_target_rel_pos_t)
-            tot_loss_pos += loss_pos
+            y_pred_pos = class_to_pos_net(vent_out, dors_out, y_shape_oh, y_col_oh)
+            tot_loss_class_to_pos += class_to_pos_net.loss(y_pred_pos, y_target_rel_pos_t)
 
-            # Find color loss
-            y_col_idx = torch.tensor(obj_col_indices, dtype=torch.long).cuda()
-            y_pred_col = colnet(output, y_target_rel_pos_t)
-            loss_col = col_citerion(y_pred_col, y_col_idx)
+            # Find class loss
+            y_pred_col, y_pred_shape = pos_to_class_net(vent_out, dors_out, y_target_rel_pos_t)
+            tot_loss_pos_to_class += pos_to_class_net.loss(y_pred_col,y_pred_shape, y_col_idx, y_shape_idx)
 
-            tot_loss_col += loss_col
+            # UV to class loss
+            y_pred_col, y_pred_shape = uv_to_class_net(vent_out, dors_out, y_uvs)
+            tot_loss_uv_to_class += uv_to_class_net.loss(y_pred_col,y_pred_shape, y_col_idx, y_shape_idx)
 
-        print('Episode', episode, ', Loss Pos.:', tot_loss_pos.item()/num_queries, ', Loss Col.:', tot_loss_col.item()/num_queries)
+        print('Episode', episode, 
+            ', Loss Pos.:', tot_loss_class_to_pos.item()/num_queries, 
+            ', Pos to Class Loss:', tot_loss_pos_to_class.item()/num_queries,
+            ', UV to Class Loss:', tot_loss_uv_to_class.item()/num_queries)
 
-        loss = tot_loss_col + tot_loss_pos
+        loss_tot = tot_loss_pos_to_class.item() + tot_loss_class_to_pos.item() + tot_loss_uv_to_class.item()
+
+        loss = (tot_loss_pos_to_class.item()/loss_tot) * tot_loss_pos_to_class + \
+               (tot_loss_class_to_pos.item()/loss_tot) * tot_loss_class_to_pos + \
+               (tot_loss_uv_to_class.item()/loss_tot) * tot_loss_uv_to_class
 
         loss.backward()
-        nn.utils.clip_grad_norm_(params, 0.07)
+        nn.utils.clip_grad_norm_(params, 0.1)
         optimizer.step()
         
         episodes.append(episode)
         losses.append(loss.item()/num_queries)
 
-        writer.add_scalar("Loss/Pos. Loss", tot_loss_pos.item()/num_queries, episode)
-        writer.add_scalar("Loss/Col. Loss", tot_loss_col.item()/num_queries, episode)
+        writer.add_scalar("Loss/Class-to-Position-Loss", tot_loss_class_to_pos.item()/num_queries, episode)
+        writer.add_scalar("Loss/Position-to-Class-Loss", tot_loss_pos_to_class.item()/num_queries, episode)
+        writer.add_scalar("Loss/UV-to-Class-Loss", tot_loss_uv_to_class.item()/num_queries, episode)
         episode += 1
 
-        if episode % 1000 == 0:
-            torch.save(vnet.state_dict(), 'vnet-model-csipo.mdl')
-            torch.save(posnet.state_dict(), 'posnet-model-csipo.mdl')
-            torch.save(colnet.state_dict(), 'colnet-model-csipo.mdl')
+        if episode % 500 == 0:
+            torch.save(vision_net.state_dict(), 'vnet-model-csipo.mdl')
+            torch.save(ventral_net.state_dict(), 'ventral-net-csipo.mdl')
+            torch.save(dorsal_net.state_dict(), 'dorsal-net-csipo.mdl')
+            torch.save(class_to_pos_net.state_dict(), 'posnet-model-csipo.mdl')
+            torch.save(pos_to_class_net.state_dict(), 'colnet-model-csipo.mdl')
+            torch.save(uv_to_class_net.state_dict(), 'uvtoclass-model-csipo.mdl')
             torch.save(cae.state_dict(), 'cae-model-csipo.mdl')
 
 
     plt.plot(episodes, losses)
     plt.show()
 
-def euclidean_distance_loss(y_pred_pos, y_target_pos_t):
-    # sqrt(x^2 + y^2 + z^2)
-    diff = y_pred_pos - y_target_pos_t
-    diff_squared = diff**2
-    diff_sum = torch.sum(diff_squared, dim=1)
-    diff_sum_sqrt = torch.sqrt(diff_sum)
 
-    loss_pos = torch.mean(diff_sum_sqrt)
-    return loss_pos
     
