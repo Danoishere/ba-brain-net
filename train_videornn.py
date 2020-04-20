@@ -39,23 +39,23 @@ def train_video_rnn(queue, lock, load_model=True):
     vision_net.train()
 
     ventral_net = net.VentralNet().cuda()
-    ventral_net.load_state_dict(torch.load('active-models/ventral-net-csipo.mdl'))
+    #ventral_net.load_state_dict(torch.load('active-models/ventral-net-csipo.mdl'))
     ventral_net.train()
 
     dorsal_net = net.DorsalNet().cuda()
-    dorsal_net.load_state_dict(torch.load('active-models/dorsal-net-csipo.mdl'))
+    #dorsal_net.load_state_dict(torch.load('active-models/dorsal-net-csipo.mdl'))
     dorsal_net.train()
 
     class_to_pos_net = net.ClassToPosNet().cuda()
-    class_to_pos_net.load_state_dict(torch.load('active-models/posnet-model-csipo.mdl'))
+    #class_to_pos_net.load_state_dict(torch.load('active-models/posnet-model-csipo.mdl'))
     class_to_pos_net.train()
 
     pos_to_class_net = net.PosToClass().cuda()
-    pos_to_class_net.load_state_dict(torch.load('active-models/colnet-model-csipo.mdl'))
+    #pos_to_class_net.load_state_dict(torch.load('active-models/colnet-model-csipo.mdl'))
     pos_to_class_net.train()
 
     uv_to_class_net = net.UVToClass().cuda()
-    uv_to_class_net.load_state_dict(torch.load('active-models/uvtoclass-model-csipo.mdl'))
+    #uv_to_class_net.load_state_dict(torch.load('active-models/uvtoclass-model-csipo.mdl'))
     uv_to_class_net.train()
 
     params = []
@@ -202,7 +202,7 @@ def train_video_rnn(queue, lock, load_model=True):
                 (tot_loss_uv_to_class.item()/loss_tot) * tot_loss_uv_to_class
 
             (tot_loss_class_to_pos).backward()
-            nn.utils.clip_grad_norm_(params, 0.1)
+            nn.utils.clip_grad_value_(params, 0.1)
             optimizer.step()
             
             episodes.append(episode)

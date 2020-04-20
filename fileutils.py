@@ -18,7 +18,7 @@ temp_path = config.temp_path
 batch_size = config.batch_size
 sequence_length = config.sequence_length
 w, h = config.w, config.h
-zip_files = list(glob.glob(training_path + "*.zip"))
+# zip_files = list(glob.glob(training_path + "*.zip"))
 
 pool = ThreadPool(10)
 process_suffix = str(os.getpid()) + "/" 
@@ -52,6 +52,8 @@ def reshape_frame(rgb, depth):
 def load_batch():
     batch_x = np.zeros((sequence_length, batch_size, 4, h, w))
     batch_idx = 0
+
+    zip_files = list(glob.glob(training_path + "*.zip"))
 
     scenes = []
     selected_files = random.sample(zip_files, batch_size)

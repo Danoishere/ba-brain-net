@@ -1,6 +1,6 @@
 
 lr=0.0001
-batch_size = 64
+batch_size = 128
 sequence_length = 36
 w,h = 128, 128
 

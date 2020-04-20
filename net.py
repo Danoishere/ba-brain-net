@@ -37,9 +37,9 @@ class VentralNet(nn.Module):
     def __init__(self):
         super(VentralNet, self).__init__()
         self.lrelu = nn.LeakyReLU()
-        self.fc1 = nn.Linear(2048, 1024)
-        self.fc2 = nn.Linear(1024, 512)
-        self.fc3 = nn.Linear(512, 512)
+        self.fc1 = nn.Linear(2048, 2048)
+        self.fc2 = nn.Linear(2048, 2048)
+        self.fc3 = nn.Linear(2048, 1024)
 
     def forward(self, v1_out):
         out = self.lrelu(v1_out)
@@ -55,9 +55,9 @@ class DorsalNet(nn.Module):
     def __init__(self):
         super(DorsalNet, self).__init__()
         self.lrelu = nn.LeakyReLU()
-        self.fc1 = nn.Linear(2048, 1024)
-        self.fc2 = nn.Linear(1024, 512)
-        self.fc3 = nn.Linear(512, 512)
+        self.fc1 = nn.Linear(2048, 2048)
+        self.fc2 = nn.Linear(2048, 2048)
+        self.fc3 = nn.Linear(2048, 1024)
 
     def forward(self, v1_out):
         out = self.lrelu(v1_out)
@@ -73,7 +73,7 @@ class ClassToPosNet(nn.Module):
     def __init__(self):
         super(ClassToPosNet, self).__init__()
         self.lrelu = nn.LeakyReLU()
-        self.fc1 = nn.Linear(512 + 512, 1024)
+        self.fc1 = nn.Linear(1024 + 1024, 1024)
         self.fc2 = nn.Linear(1024, 1024)
         self.fc3 = nn.Linear(1024 + 256, 1024)
         self.fc4 = nn.Linear(1024, 64)
@@ -125,9 +125,9 @@ class PosToClass(nn.Module):
         self.col_criterion = nn.CrossEntropyLoss().cuda()
         self.shape_criterion = nn.CrossEntropyLoss().cuda()
 
-        self.fc1 = nn.Linear(512 + 512 + 3, 512)
-        self.fc2 = nn.Linear(512, 512)
-        self.fc3 = nn.Linear(512, 512)
+        self.fc1 = nn.Linear(1024 + 1024 + 3, 1024)
+        self.fc2 = nn.Linear(1024, 1024)
+        self.fc3 = nn.Linear(1024, 512)
         self.fc4 = nn.Linear(512, 64)
 
         self.logits_col = nn.Linear(64, 7)
@@ -163,9 +163,9 @@ class UVToClass(nn.Module):
         self.col_criterion = nn.CrossEntropyLoss().cuda()
         self.shape_criterion = nn.CrossEntropyLoss().cuda()
 
-        self.fc1 = nn.Linear(512 + 512 + 2, 512)
-        self.fc2 = nn.Linear(512, 512)
-        self.fc3 = nn.Linear(512, 512)
+        self.fc1 = nn.Linear(1024 + 1024 + 2, 1024)
+        self.fc2 = nn.Linear(1024, 1024)
+        self.fc3 = nn.Linear(1024, 512)
         self.fc4 = nn.Linear(512, 64)
         self.fc5 = nn.Linear(64, 7)
         self.fc6 = nn.Linear(64, 5)
