@@ -84,16 +84,15 @@ class ClassToPosNet(nn.Module):
         self.side_fc3 = nn.Linear(256, 256)
 
 
-    def forward(self, vent_in, dors_in, shape, col):
+    def forward(self, vent_in, dors_in, col, shape):
 
-        side = torch.cat((shape, col), 1)
+        side = torch.cat((col, shape), 1)
         side = self.side_fc1(side)
         side = self.lrelu(side)
         side = self.side_fc2(side)
         side = self.lrelu(side)
         side = self.side_fc3(side)
         side = self.lrelu(side)
-
 
         out = torch.cat((vent_in, dors_in), 1)
         out = self.fc1(out)
@@ -107,7 +106,6 @@ class ClassToPosNet(nn.Module):
         out = self.fc4(out)
         out = self.lrelu(out)
         out = self.fc5(out)
-
 
         return out
 
