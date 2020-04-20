@@ -43,10 +43,8 @@ if __name__ == '__main__':
     # Create a lock object to synchronize resource access
     lock = Lock()
 
-    producers = []
-    for p in range(3):
-        producer = Process(target=prod, args=(queue, lock))
-        producer.start()
+    producer = Process(target=prod, args=(queue, lock))
+    producer.start()
 
     if args.ae:
         train_autoencoder(queue, lock)
