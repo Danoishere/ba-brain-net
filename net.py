@@ -32,14 +32,14 @@ class VisionNet(nn.Module):
         out = out.reshape(batch_size, -1)
         return out
 
-# WHAT
-class VentralNet(nn.Module):
+class VisualCortexNet(nn.Module):
     def __init__(self):
-        super(VentralNet, self).__init__()
+        super(VisualCortexNet, self).__init__()
         self.lrelu = nn.LeakyReLU()
         self.fc1 = nn.Linear(2048, 2048)
         self.fc2 = nn.Linear(2048, 2048)
-        self.fc3 = nn.Linear(2048, 1024)
+        self.fc3 = nn.Linear(2048, 2048)
+        self.fc4 = nn.Linear(2048, 2048)
 
     def forward(self, v1_out):
         out = self.lrelu(v1_out)
@@ -48,43 +48,29 @@ class VentralNet(nn.Module):
         out = self.fc2(out)
         out = self.lrelu(out)
         out = self.fc3(out)
+        out = self.lrelu(out)
+        out = self.fc4(out)
         return out
 
-# WHERE
-class DorsalNet(nn.Module):
-    def __init__(self):
-        super(DorsalNet, self).__init__()
-        self.lrelu = nn.LeakyReLU()
-        self.fc1 = nn.Linear(2048, 2048)
-        self.fc2 = nn.Linear(2048, 2048)
-        self.fc3 = nn.Linear(2048, 1024)
-
-    def forward(self, v1_out):
-        out = self.lrelu(v1_out)
-        out = self.fc1(out)
-        out = self.lrelu(out)
-        out = self.fc2(out)
-        out = self.lrelu(out)
-        out = self.fc3(out)
-        return out
 
 # (vent_in, dors_in, shape, col) -> pos
 class ClassToPosNet(nn.Module):
     def __init__(self):
         super(ClassToPosNet, self).__init__()
         self.lrelu = nn.LeakyReLU()
-        self.fc1 = nn.Linear(1024 + 1024, 1024)
-        self.fc2 = nn.Linear(1024, 1024)
-        self.fc3 = nn.Linear(1024 + 256, 1024)
-        self.fc4 = nn.Linear(1024, 64)
-        self.fc5 = nn.Linear(64, 3)
+        self.fc1 = nn.Linear(2048 + 256, 2048)
+        self.fc2 = nn.Linear(2048, 2048)
+        self.fc3 = nn.Linear(2048, 1024)
+        self.fc4 = nn.Linear(1024, 1024)
+        self.fc5 = nn.Linear(1024, 64)
+        self.fc6 = nn.Linear(64, 3)
 
         self.side_fc1 = nn.Linear(12, 64)
         self.side_fc2 = nn.Linear(64, 256)
         self.side_fc3 = nn.Linear(256, 256)
 
 
-    def forward(self, vent_in, dors_in, col, shape):
+    def forward(self, v1_in, col, shape):
 
         side = torch.cat((col, shape), 1)
         side = self.side_fc1(side)
@@ -94,18 +80,18 @@ class ClassToPosNet(nn.Module):
         side = self.side_fc3(side)
         side = self.lrelu(side)
 
-        out = torch.cat((vent_in, dors_in), 1)
+        out = torch.cat((v1_in, side), 1)
         out = self.fc1(out)
         out = self.lrelu(out)
         out = self.fc2(out)
         out = self.lrelu(out)
-
-        out = torch.cat((out, side), 1)
         out = self.fc3(out)
         out = self.lrelu(out)
         out = self.fc4(out)
         out = self.lrelu(out)
         out = self.fc5(out)
+        out = self.lrelu(out)
+        out = self.fc6(out)
 
         return out
 
@@ -125,7 +111,7 @@ class PosToClass(nn.Module):
         self.col_criterion = nn.CrossEntropyLoss().cuda()
         self.shape_criterion = nn.CrossEntropyLoss().cuda()
 
-        self.fc1 = nn.Linear(1024 + 1024 + 3, 1024)
+        self.fc1 = nn.Linear(2048 + 3, 1024)
         self.fc2 = nn.Linear(1024, 1024)
         self.fc3 = nn.Linear(1024, 512)
         self.fc4 = nn.Linear(512, 64)
@@ -134,8 +120,8 @@ class PosToClass(nn.Module):
         self.logits_shape = nn.Linear(64, 5)
 
     # give position, receive color
-    def forward(self, vent_in, dors_in, pos):
-        out = torch.cat((vent_in, dors_in, pos), 1)
+    def forward(self, v1_in, pos):
+        out = torch.cat((v1_in, pos), 1)
         out = self.fc1(out)
         out = torch.relu(out)
         out = self.fc2(out)
@@ -163,7 +149,7 @@ class UVToClass(nn.Module):
         self.col_criterion = nn.CrossEntropyLoss().cuda()
         self.shape_criterion = nn.CrossEntropyLoss().cuda()
 
-        self.fc1 = nn.Linear(1024 + 1024 + 2, 1024)
+        self.fc1 = nn.Linear(2048 + 2, 1024)
         self.fc2 = nn.Linear(1024, 1024)
         self.fc3 = nn.Linear(1024, 512)
         self.fc4 = nn.Linear(512, 64)
@@ -171,8 +157,8 @@ class UVToClass(nn.Module):
         self.fc6 = nn.Linear(64, 5)
 
     # give position, receive color
-    def forward(self, vent_in, dors_in, uv):
-        out = torch.cat((vent_in, dors_in, uv), 1)
+    def forward(self, v1_in, uv):
+        out = torch.cat((v1_in, uv), 1)
         out = self.fc1(out)
         out = torch.relu(out)
         out = self.fc2(out)
