@@ -14,7 +14,7 @@ class VisionNet(nn.Module):
         super(VisionNet, self).__init__()
         self.hidden_dim = 2048
         self.lrelu = nn.LeakyReLU()
-        self.n_layers = 1
+        self.n_layers = 2
         self.rnn = nn.LSTM(2048, self.hidden_dim, self.n_layers)
 
 

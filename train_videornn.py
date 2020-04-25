@@ -35,7 +35,7 @@ def train_video_rnn(queue, lock, load_model=True):
     cae.train()
 
     lgn_net = net.VisionNet().cuda()
-    lgn_net.load_state_dict(torch.load('active-models/lgn-net.mdl'))
+    #lgn_net.load_state_dict(torch.load('active-models/lgn-net.mdl'))
     lgn_net.train()
 
     visual_cortex_net = net.VisualCortexNet().cuda()
@@ -84,7 +84,7 @@ def train_video_rnn(queue, lock, load_model=True):
         shuffle(frames)
 
         start_frame = randint(0, sequence_length - 1)
-        clip_length = randint(8,16) + 1
+        clip_length = randint(4, 8) + 1
         
         optimizer.zero_grad()
         lgn_net.init_hidden()
