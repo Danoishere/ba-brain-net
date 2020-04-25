@@ -21,7 +21,7 @@ def train_autoencoder(queue, lock, torchDevice, load_model=True):
 
     cae = ConvAutoencoder().to(torchDevice)
     if load_model:
-        cae.load_state_dict(torch.load('cae-model-csipo.mdl'))
+        cae.load_state_dict(torch.load('cae-model', map_location=torchDevice))
         cae.eval()
         # torch.save(cae, "cae-model-full.mdl")
 

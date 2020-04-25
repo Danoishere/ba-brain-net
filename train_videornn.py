@@ -30,19 +30,19 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     shapes = ["Cube", "CubeHollow", "Diamond", "Cone", "Cylinder"]
 
     cae = ConvAutoencoder().to(torchDevice)
-    cae.load_state_dict(torch.load('cae-model-csipo.mdl'))
+    cae.load_state_dict(torch.load('cae-model-csipo.mdl', map_location=torchDevice))
     cae.train()
 
     vnet = net.Net().to(torchDevice)
-    vnet.load_state_dict(torch.load('vnet-model-csipo.mdl'))
+    vnet.load_state_dict(torch.load('vnet-model-csipo.mdl', map_location=torchDevice))
     vnet.train()
 
     posnet = net.PosNet().to(torchDevice)
-    posnet.load_state_dict(torch.load('posnet-model-csipo.mdl'))
+    posnet.load_state_dict(torch.load('posnet-model-csipo.mdl', map_location=torchDevice))
     posnet.train()
 
     colnet = net.ColNet().to(torchDevice)
-    colnet.load_state_dict(torch.load('colnet-model-csipo.mdl'))
+    colnet.load_state_dict(torch.load('colnet-model-csipo.mdl', map_location=torchDevice))
     colnet.train()
     
     
