@@ -12,16 +12,16 @@ from random import shuffle
 from time import time
 
 
-def train_autoencoder(queue, lock, load_model=True):
+def train_autoencoder(queue, lock, torchDevice, load_model=True):
     lr=0.001
     batch_size = 64
     sequence_length = 36
     w, h = 128, 128
     colors = ["red", "green", "blue", "yellow", "white", "grey", "purple"]
 
-    cae = ConvAutoencoder().cuda()
+    cae = ConvAutoencoder().to(torchDevice)
     if load_model:
-        cae.load_state_dict(torch.load('cae-model'))
+        cae.load_state_dict(torch.load('cae-model-csipo.mdl'))
         cae.eval()
         # torch.save(cae, "cae-model-full.mdl")
 
@@ -52,8 +52,8 @@ def train_autoencoder(queue, lock, load_model=True):
             # Pass batch frame by frame
             for frame in range(sequence_length):
                 optimizer.zero_grad()
-                frame_input = torch.tensor(batch_x[frame], requires_grad=True).float().cuda()
-                frame_output = torch.tensor(batch_x[frame]).float().cuda()
+                frame_input = torch.tensor(batch_x[frame], requires_grad=True).float().to(torchDevice)
+                frame_output = torch.tensor(batch_x[frame]).float().to(torchDevice)
                 output = cae(frame_input)
                 loss = criterion(output, frame_output)
                 loss.backward()

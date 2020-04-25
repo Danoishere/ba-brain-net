@@ -16,7 +16,7 @@ from datetime import datetime
 
 
 
-def train_video_rnn(queue, lock, load_model=True):
+def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
     now = datetime.now()
     current_time = now.strftime("-%H-%M-%S")
@@ -29,27 +29,27 @@ def train_video_rnn(queue, lock, load_model=True):
     colors = ["red", "green", "blue", "yellow", "white", "grey", "purple"]
     shapes = ["Cube", "CubeHollow", "Diamond", "Cone", "Cylinder"]
 
-    cae = ConvAutoencoder().cuda()
+    cae = ConvAutoencoder().to(torchDevice)
     cae.load_state_dict(torch.load('cae-model-csipo.mdl'))
     cae.train()
 
-    vnet = net.Net().cuda()
+    vnet = net.Net().to(torchDevice)
     vnet.load_state_dict(torch.load('vnet-model-csipo.mdl'))
     vnet.train()
 
-    posnet = net.PosNet().cuda()
+    posnet = net.PosNet().to(torchDevice)
     posnet.load_state_dict(torch.load('posnet-model-csipo.mdl'))
     posnet.train()
 
-    colnet = net.ColNet().cuda()
+    colnet = net.ColNet().to(torchDevice)
     colnet.load_state_dict(torch.load('colnet-model-csipo.mdl'))
     colnet.train()
     
     
     # cae.requires_grad = False
 
-    col_citerion = nn.CrossEntropyLoss().cuda()
-    pos_criterion = nn.MSELoss().cuda()
+    col_citerion = nn.CrossEntropyLoss().to(torchDevice)
+    pos_criterion = nn.MSELoss().to(torchDevice)
 
     params = []
     params += list(cae.parameters())
@@ -68,20 +68,20 @@ def train_video_rnn(queue, lock, load_model=True):
         batch_x, scenes = queue.get()
 
         optimizer.zero_grad()
-        vnet.init_hidden()
+        vnet.init_hidden(torchDevice)
 
         skip = 4
         # Pass batch frame by frame
         for frame in range(int(sequence_length/skip)):
             # Dimensionen batch_x
             # (frame-nr (36), batch-nr, color, height, width)
-            frame_input = torch.tensor(batch_x[int(frame*skip)], requires_grad=True).float().cuda()
+            frame_input = torch.tensor(batch_x[int(frame*skip)], requires_grad=True).float().to(torchDevice)
             encoded = cae.encode(frame_input)
             encoded = encoded.reshape(batch_size, -1)
             output = vnet(encoded)
 
-        tot_loss_pos = torch.tensor(0.0).cuda()
-        tot_loss_col = torch.tensor(0.0).cuda()
+        tot_loss_pos = torch.tensor(0.0).to(torchDevice)
+        tot_loss_col = torch.tensor(0.0).to(torchDevice)
 
         # Sample 10 different objects combinations from each training batch.
         for i in range(num_queries):
@@ -124,9 +124,9 @@ def train_video_rnn(queue, lock, load_model=True):
             x_all_cam_pos = np.swapaxes(x_all_cam_pos, 0,1)
 
             # oh = one-hot
-            y_col_oh = torch.tensor(obj_col_onehots, requires_grad=True, dtype=torch.float32).cuda()
-            y_shape_oh = torch.tensor(obj_shape_onehots, requires_grad=True, dtype=torch.float32).cuda()
-            y_target_pos_t = torch.tensor(y_target_pos).cuda()
+            y_col_oh = torch.tensor(obj_col_onehots, requires_grad=True, dtype=torch.float32).to(torchDevice)
+            y_shape_oh = torch.tensor(obj_shape_onehots, requires_grad=True, dtype=torch.float32).to(torchDevice)
+            y_target_pos_t = torch.tensor(y_target_pos).to(torchDevice)
 
             # Find position loss
             y_pred_pos = posnet(output, y_shape_oh, y_col_oh)
@@ -134,7 +134,7 @@ def train_video_rnn(queue, lock, load_model=True):
             tot_loss_pos += loss_pos
 
             # Find color loss
-            y_col_idx = torch.tensor(obj_col_indices, dtype=torch.long).cuda()
+            y_col_idx = torch.tensor(obj_col_indices, dtype=torch.long).to(torchDevice)
             y_pred_col = colnet(output, y_target_pos_t)
             loss_col = col_citerion(y_pred_col, y_col_idx)
 
