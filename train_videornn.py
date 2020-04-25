@@ -31,7 +31,7 @@ def train_video_rnn(queue, lock, load_model=True):
     shapes = ["Cube", "CubeHollow", "Diamond", "Cone", "Cylinder"]
 
     cae = ConvNet().cuda()
-    #cae.load_state_dict(torch.load('active-models/cae-model.mdl'))
+    cae.load_state_dict(torch.load('active-models/cae-model.mdl'))
     cae.train()
 
     lgn_net = net.VisionNet().cuda()
