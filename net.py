@@ -13,6 +13,7 @@ class VisionNet(nn.Module):
     def __init__(self):
         super(VisionNet, self).__init__()
         self.hidden_dim = 2048
+        self.lrelu = nn.LeakyReLU()
         self.n_layers = 1
         self.rnn = nn.LSTM(2048, self.hidden_dim, self.n_layers)
 
@@ -30,19 +31,22 @@ class VisionNet(nn.Module):
         out, hidden = self.rnn(out, self.hidden)
         self.hidden = hidden
         out = out.reshape(batch_size, -1)
+        out = self.lrelu(out)
         return out
 
 class VisualCortexNet(nn.Module):
     def __init__(self):
         super(VisualCortexNet, self).__init__()
         self.lrelu = nn.LeakyReLU()
+        self.batchnorm1 = nn.BatchNorm1d(2048)
         self.fc1 = nn.Linear(2048, 2048)
         self.fc2 = nn.Linear(2048, 2048)
         self.fc3 = nn.Linear(2048, 2048)
         self.fc4 = nn.Linear(2048, 2048)
+        self.batchnorm2 = nn.BatchNorm1d(2048)
 
     def forward(self, v1_out):
-        out = self.lrelu(v1_out)
+        out = self.batchnorm1(v1_out)
         out = self.fc1(out)
         out = self.lrelu(out)
         out = self.fc2(out)
@@ -50,6 +54,7 @@ class VisualCortexNet(nn.Module):
         out = self.fc3(out)
         out = self.lrelu(out)
         out = self.fc4(out)
+        out = self.batchnorm2(out)
         return out
 
 

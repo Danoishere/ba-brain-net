@@ -129,3 +129,7 @@ models/*
 tensorboard/*
 training-data/*
 tensorboard-backup/*
+active-models-well-trained-50k-static-lr0-00005/*
+model-backups/*
+runs/*
+active-models/optimizer.opt
