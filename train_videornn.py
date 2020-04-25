@@ -10,7 +10,7 @@ import net
 from net import Query
 import matplotlib.pyplot as plt
 from random import shuffle, randint
-from autoencoder import ConvAutoencoder
+from convnet import ConvNet
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 import config
@@ -30,8 +30,8 @@ def train_video_rnn(queue, lock, load_model=True):
     colors = ["red", "green", "blue", "yellow", "white", "grey", "purple"]
     shapes = ["Cube", "CubeHollow", "Diamond", "Cone", "Cylinder"]
 
-    cae = ConvAutoencoder().cuda()
-    cae.load_state_dict(torch.load('active-models/cae-model.mdl'))
+    cae = ConvNet().cuda()
+    #cae.load_state_dict(torch.load('active-models/cae-model.mdl'))
     cae.train()
 
     lgn_net = net.VisionNet().cuda()
@@ -84,7 +84,7 @@ def train_video_rnn(queue, lock, load_model=True):
         shuffle(frames)
 
         start_frame = randint(0, sequence_length - 1)
-        clip_length = randint(8,16) + 1
+        clip_length = randint(4,10) + 1
         
         optimizer.zero_grad()
         lgn_net.init_hidden()
@@ -96,13 +96,13 @@ def train_video_rnn(queue, lock, load_model=True):
             print(current_frame)
             frame_input = torch.tensor(batch_x[current_frame], requires_grad=True).float().cuda()
             encoded = cae.encode(frame_input)
-            output = encoded.reshape(batch_size, -1)
-            output = lgn_net(output)
+            frame_enc = encoded.reshape(batch_size, -1)
+            lgn_out = lgn_net(frame_enc)
             last_frame = current_frame
 
             if clip_frame > 4:
 
-                v1_out = visual_cortex_net(output)
+                v1_out = visual_cortex_net(lgn_out)
 
                 tot_loss_class_to_pos = [] #torch.tensor(0.0).cuda()
                 tot_loss_pos_to_class = torch.tensor(0.0).cuda()

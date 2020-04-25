@@ -13,6 +13,7 @@ class VisionNet(nn.Module):
     def __init__(self):
         super(VisionNet, self).__init__()
         self.hidden_dim = 2048
+        
         self.lrelu = nn.LeakyReLU()
         self.n_layers = 1
         self.rnn = nn.LSTM(2048, self.hidden_dim, self.n_layers)
@@ -28,8 +29,7 @@ class VisionNet(nn.Module):
     def forward(self, frame):
         # (Sequence Length, Batch size, Inputs)
         out = frame.reshape(1, batch_size, -1)
-        out, hidden = self.rnn(out, self.hidden)
-        self.hidden = hidden
+        out, self.hidden = self.rnn(out, self.hidden)
         out = out.reshape(batch_size, -1)
         out = self.lrelu(out)
         return out
