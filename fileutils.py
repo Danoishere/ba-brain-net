@@ -11,6 +11,7 @@ import torch.nn as nn
 import numpy as np
 
 training_path = 'D:/training-data-very-simple-ss/'
+#training_path = '/Users/ralph/Documents/Blender/ba_generated_scenes/'
 temp_path = './.temp/'
 
 lr=0.0001
