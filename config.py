@@ -8,4 +8,5 @@ num_queries = 8
 skip_factor = 2
 
 training_path = 'D:/training-data-relative-pos-no-obstacle/'
+#training_path = '/Users/ralph/Documents/Blender/training-data-relative-pos-no-obstacle/'
 temp_path = './.temp/'

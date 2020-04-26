@@ -18,11 +18,11 @@ class VisionNet(nn.Module):
         self.rnn = nn.LSTM(2048, self.hidden_dim, self.n_layers)
 
 
-    def init_hidden(self):
+    def init_hidden(self, torchDevice):
         # This method generates the first hidden state of zeros which we'll use in the forward pass
         # We'll send the tensor holding the hidden state to the device we specified earlier as well
-        self.hidden = (torch.zeros(self.n_layers, batch_size, self.hidden_dim).cuda(),
-                       torch.zeros(self.n_layers, batch_size, self.hidden_dim).cuda())
+        self.hidden = (torch.zeros(self.n_layers, batch_size, self.hidden_dim).to(torchDevice),
+                       torch.zeros(self.n_layers, batch_size, self.hidden_dim).to(torchDevice))
 
 
     def forward(self, frame):

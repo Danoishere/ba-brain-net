@@ -16,7 +16,7 @@ from datetime import datetime
 import config
 
 
-def train_video_rnn(queue, lock, load_model=True):
+def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
     now = datetime.now()
     current_time = now.strftime("-%H-%M-%S")
@@ -30,20 +30,20 @@ def train_video_rnn(queue, lock, load_model=True):
     colors = ["red", "green", "blue", "yellow", "white", "grey", "purple"]
     shapes = ["Cube", "CubeHollow", "Diamond", "Cone", "Cylinder"]
 
-    cae = ConvAutoencoder().cuda()
-    cae.load_state_dict(torch.load('active-models/cae-model.mdl'))
+    cae = ConvAutoencoder().to(torchDevice)
+    cae.load_state_dict(torch.load('active-models/cae-model.mdl', map_location=torchDevice))
     cae.train()
 
-    lgn_net = net.VisionNet().cuda()
-    lgn_net.load_state_dict(torch.load('active-models/lgn-net.mdl'))
+    lgn_net = net.VisionNet().to(torchDevice)
+    lgn_net.load_state_dict(torch.load('active-models/lgn-net.mdl', map_location=torchDevice))
     lgn_net.train()
 
-    visual_cortex_net = net.VisualCortexNet().cuda()
-    visual_cortex_net.load_state_dict(torch.load('active-models/visual-cortex-net.mdl'))
+    visual_cortex_net = net.VisualCortexNet().to(torchDevice)
+    visual_cortex_net.load_state_dict(torch.load('active-models/visual-cortex-net.mdl', map_location=torchDevice))
     visual_cortex_net.train()
 
-    class_to_pos_net = net.ClassToPosNet().cuda()
-    class_to_pos_net.load_state_dict(torch.load('active-models/posnet-model.mdl'))
+    class_to_pos_net = net.ClassToPosNet().to(torchDevice)
+    class_to_pos_net.load_state_dict(torch.load('active-models/posnet-model.mdl', map_location=torchDevice))
     class_to_pos_net.train()
 
     """
@@ -87,14 +87,14 @@ def train_video_rnn(queue, lock, load_model=True):
         clip_length = randint(8,16) + 1
         
         optimizer.zero_grad()
-        lgn_net.init_hidden()
+        lgn_net.init_hidden(torchDevice)
 
         clip_frame = 0
         for frame in range(start_frame, start_frame + clip_length):
             clip_frame += 1
             current_frame = frame % sequence_length # int(frame*skip + offset)
             print(current_frame)
-            frame_input = torch.tensor(batch_x[current_frame], requires_grad=True).float().cuda()
+            frame_input = torch.tensor(batch_x[current_frame], requires_grad=True).float().to(torchDevice)
             encoded = cae.encode(frame_input)
             output = encoded.reshape(batch_size, -1)
             output = lgn_net(output)
@@ -105,8 +105,8 @@ def train_video_rnn(queue, lock, load_model=True):
                 v1_out = visual_cortex_net(output)
 
                 tot_loss_class_to_pos = [] #torch.tensor(0.0).cuda()
-                tot_loss_pos_to_class = torch.tensor(0.0).cuda()
-                tot_loss_uv_to_class = torch.tensor(0.0).cuda()
+                tot_loss_pos_to_class = torch.tensor(0.0).to(torchDevice)
+                tot_loss_uv_to_class = torch.tensor(0.0).to(torchDevice)
 
                 # Sample 10 different objects combinations from each training batch.
                 for i in range(num_queries):
@@ -168,12 +168,12 @@ def train_video_rnn(queue, lock, load_model=True):
 
 
                     # oh = one-hot
-                    y_col_oh = torch.tensor(obj_col_onehots, requires_grad=True, dtype=torch.float32).cuda()
-                    y_shape_oh = torch.tensor(obj_shape_onehots, requires_grad=True, dtype=torch.float32).cuda()
-                    y_target_rel_pos_t = torch.tensor(y_target_rel_pos, dtype=torch.float32).cuda()
-                    y_col_idx = torch.tensor(obj_col_indices, dtype=torch.long).cuda()
-                    y_shape_idx = torch.tensor(obj_shape_indices, dtype=torch.long).cuda()
-                    y_uvs = torch.tensor(all_uvs, requires_grad=True, dtype=torch.float32).cuda()
+                    y_col_oh = torch.tensor(obj_col_onehots, requires_grad=True, dtype=torch.float32).to(torchDevice)
+                    y_shape_oh = torch.tensor(obj_shape_onehots, requires_grad=True, dtype=torch.float32).to(torchDevice)
+                    y_target_rel_pos_t = torch.tensor(y_target_rel_pos, dtype=torch.float32).to(torchDevice)
+                    y_col_idx = torch.tensor(obj_col_indices, dtype=torch.long).to(torchDevice)
+                    y_shape_idx = torch.tensor(obj_shape_indices, dtype=torch.long).to(torchDevice)
+                    y_uvs = torch.tensor(all_uvs, requires_grad=True, dtype=torch.float32).to(torchDevice)
 
                     # Find position loss
                     y_pred_pos = class_to_pos_net(v1_out, y_col_oh, y_shape_oh)
