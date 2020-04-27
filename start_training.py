@@ -6,7 +6,7 @@ from fileutils import load_batch
 from train_autoencoder import train_autoencoder
 from train_videornn import train_video_rnn
 import argparse
-
+import torch
 
  
 # Producer function that places data on the Queue
@@ -35,7 +35,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='BA>>Programm')
     parser.add_argument('--ae', help='Run auto-encoder', action='store_true')
     parser.add_argument('--vrnn', help='Video RNN', action='store_true')
+    parser.add_argument('--disable-cuda', action='store_true',
+                    help='Disable CUDA')
     args = parser.parse_args()
+    args.device = None
+    if not args.disable_cuda and torch.cuda.is_available():
+        args.device = torch.device('cuda')
+    else:
+        args.device = torch.device('cpu')
 
     # Create the Queue object
     queue = Queue(maxsize=3)
@@ -47,9 +54,9 @@ if __name__ == '__main__':
     producer.start()
 
     if args.ae:
-        train_autoencoder(queue, lock)
+        train_autoencoder(queue, lock, args.device)
     if args.vrnn:
-        train_video_rnn(queue, lock)
+        train_video_rnn(queue, lock, args.device)
 
     producer.join()
  

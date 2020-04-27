@@ -18,11 +18,11 @@ class VisionNet(nn.Module):
         self.rnn = nn.LSTM(2048, self.hidden_dim, self.n_layers)
 
 
-    def init_hidden(self):
+    def init_hidden(self, torchDevice):
         # This method generates the first hidden state of zeros which we'll use in the forward pass
         # We'll send the tensor holding the hidden state to the device we specified earlier as well
-        self.hidden = (torch.zeros(self.n_layers, batch_size, self.hidden_dim).cuda(),
-                       torch.zeros(self.n_layers, batch_size, self.hidden_dim).cuda())
+        self.hidden = (torch.zeros(self.n_layers, batch_size, self.hidden_dim).to(torchDevice),
+                       torch.zeros(self.n_layers, batch_size, self.hidden_dim).to(torchDevice))
 
 
     def forward(self, frame):
@@ -111,10 +111,10 @@ class ClassToPosNet(nn.Module):
 
 # (vent_in, dors_in, pos) -> (col, shape)
 class PosToClass(nn.Module):
-    def __init__(self):
+    def __init__(self, torchDevice):
         super(PosToClass, self).__init__()
-        self.col_criterion = nn.CrossEntropyLoss().cuda()
-        self.shape_criterion = nn.CrossEntropyLoss().cuda()
+        self.col_criterion = nn.CrossEntropyLoss().to(torchDevice)
+        self.shape_criterion = nn.CrossEntropyLoss().to(torchDevice)
         self.lrelu = nn.LeakyReLU()
         self.fc1 = nn.Linear(2048 + 3, 1024)
         self.fc2 = nn.Linear(1024, 1024)
@@ -154,10 +154,10 @@ class PosToClass(nn.Module):
 
 # (vent_in, dors_in, uv) -> (col, shape)
 class UVToClass(nn.Module):
-    def __init__(self):
+    def __init__(self, torchDevice):
         super(UVToClass, self).__init__()
-        self.col_criterion = nn.CrossEntropyLoss().cuda()
-        self.shape_criterion = nn.CrossEntropyLoss().cuda()
+        self.col_criterion = nn.CrossEntropyLoss().to(torchDevice)
+        self.shape_criterion = nn.CrossEntropyLoss().to(torchDevice)
         self.lrelu = nn.LeakyReLU()
         self.fc1 = nn.Linear(2048 + 2, 1024)
         self.fc2 = nn.Linear(1024, 1024)
