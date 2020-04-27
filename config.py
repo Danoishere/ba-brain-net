@@ -1,6 +1,9 @@
 
-lr=0.000005
-batch_size = 16
+# lr=0.000005 #local
+lr=0.00001
+
+#batch_size = 16 #local
+batch_size = 64
 sequence_length = 36
 w,h = 128, 128
 
