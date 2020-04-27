@@ -48,18 +48,18 @@ def train_video_rnn(queue, lock, load_model=True):
 
     
     pos_to_class_net = net.PosToClass().cuda()
-    #pos_to_class_net.load_state_dict(torch.load('active-models/colnet-model.mdl'))
+    pos_to_class_net.load_state_dict(torch.load('active-models/colnet-model.mdl'))
     pos_to_class_net.train()
 
     uv_to_class_net = net.UVToClass().cuda()
-    #uv_to_class_net.load_state_dict(torch.load('active-models/uvtoclass-model.mdl'))
+    uv_to_class_net.load_state_dict(torch.load('active-models/uvtoclass-model.mdl'))
     uv_to_class_net.train()
 
 
     params = []
-    #params += list(cae.parameters())
-    #params += list(lgn_net.parameters())
-    #params += list(visual_cortex_net.parameters())
+    params += list(cae.parameters())
+    params += list(lgn_net.parameters())
+    params += list(visual_cortex_net.parameters())
     params += list(class_to_pos_net.parameters())
     params += list(pos_to_class_net.parameters())
     params += list(uv_to_class_net.parameters())
@@ -80,11 +80,6 @@ def train_video_rnn(queue, lock, load_model=True):
         # Pass batch frame by frame
 
         for repetition in range(3):
-            to_frame = int(sequence_length/skip) - randint(0,int((sequence_length/skip)/4))
-            frames = list(range(sequence_length))
-            offset = randint(0, skip - 1)
-            shuffle(frames)
-
             start_frame = randint(0, sequence_length - 1)
             clip_length = randint(4, 8) + 1
             
