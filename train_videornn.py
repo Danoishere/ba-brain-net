@@ -47,14 +47,15 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     class_to_pos_net.train()
 
     pos_to_class_net = net.PosToClass(torchDevice).to(torchDevice)
-    pos_to_class_net.load_state_dict(torch.load('active-models/colnet-model.mdl'))
+    pos_to_class_net.load_state_dict(torch.load('active-models/colnet-model.mdl', map_location=torchDevice))
     pos_to_class_net.train()
 
     uv_to_class_net = net.UVToClass(torchDevice).to(torchDevice)
-    uv_to_class_net.load_state_dict(torch.load('active-models/uvtoclass-model.mdl'))
-
+    uv_to_class_net.load_state_dict(torch.load('active-models/uvtoclass-model.mdl', map_location=torchDevice))
     uv_to_class_net.train()
 
+    count_net = net.ObjCountNet(torchDevice).to(torchDevice)
+    count_net.train()
 
     params = []
     params += list(cae.parameters())
@@ -182,6 +183,8 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         y_pred_col, y_pred_shape = uv_to_class_net(v1_out, y_uvs)
                         tot_loss_uv_to_class += [uv_to_class_net.loss(y_pred_col,y_pred_shape, y_col_idx, y_shape_idx)]
 
+                        l, c, s = count_net(v1_out)
+
                     tot_loss_class_to_pos = torch.stack(tot_loss_class_to_pos)
                     tot_loss_class_to_pos = torch.mean(tot_loss_class_to_pos)
 
@@ -190,6 +193,8 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
                     tot_loss_uv_to_class = torch.stack(tot_loss_uv_to_class)
                     tot_loss_uv_to_class = torch.mean(tot_loss_uv_to_class)
+
+                    
 
                     print('Episode', episode, ', Loss Pos.:', tot_loss_class_to_pos.item())
 

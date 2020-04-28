@@ -196,3 +196,81 @@ class UVToClass(nn.Module):
         shape_loss = self.shape_criterion(pred_shape_logits, target_shape_idx)
         total_loss = col_loss + shape_loss
         return total_loss
+
+
+
+
+class ObjCountNet(nn.Module):
+    def __init__(self, torchDevice):
+        super(ObjCountNet, self).__init__()
+        self.col_criterion = nn.CrossEntropyLoss().to(torchDevice)
+        self.shape_criterion = nn.CrossEntropyLoss().to(torchDevice)
+        self.done_criterion = nn.BCEWithLogitsLoss().to(torchDevice)
+
+        self.lrelu = nn.LeakyReLU()
+        self.n_layers = 1
+        self.hidden_dim = 1024
+
+        self.fc1 = nn.Linear(2048, 2048)
+        self.rnn = nn.LSTM(2048, self.hidden_dim, self.n_layers)
+
+        self.fc2 = nn.Linear(1024, 512)
+        self.fc3 = nn.Linear(512, 512)
+        self.fc4 = nn.Linear(512, 256)
+
+        self.binary_done = nn.Linear(256, 7)
+        self.logits_col = nn.Linear(256, 7)
+        self.logits_shape = nn.Linear(256, 5)
+        self.obj_pos = nn.Linear(256, 3)
+        self.torchDevice = torchDevice
+
+        
+
+    def init_hidden(self, torchDevice):
+        # This method generates the first hidden state of zeros which we'll use in the forward pass
+        # We'll send the tensor holding the hidden state to the device we specified earlier as well
+        self.hidden = (torch.zeros(self.n_layers, batch_size, self.hidden_dim).to(torchDevice),
+                       torch.zeros(self.n_layers, batch_size, self.hidden_dim).to(torchDevice))
+
+
+    def forward(self, v1_in):
+        self.init_hidden(self.torchDevice)
+
+        out = self.fc1(v1_in)
+        out = self.lrelu(out)
+        
+        stop = False
+
+        l_done = []
+        l_col = []
+        l_shape = []
+        l_pos = []
+
+        out = out.reshape(1,batch_size, -1)
+        for i in range(10):
+            obj_out, self.hidden = self.rnn(out, self.hidden)
+            obj_out = self.lrelu(obj_out)
+            obj_out = self.fc2(obj_out)
+            obj_out = self.lrelu(obj_out)
+            obj_out = self.fc3(obj_out)
+            obj_out = self.lrelu(obj_out)
+            obj_out = self.fc4(obj_out)
+            obj_out = self.lrelu(obj_out)
+
+            done = self.binary_done(obj_out)
+            col = self.logits_col(obj_out)
+            shape = self.logits_shape(obj_out)
+            pos = self.obj_pos(obj_out)
+
+            l_done.append(done)
+            l_col.append(col)
+            l_shape.append(shape)
+            l_pos.append(pos)
+
+        return l_done, l_col, l_shape
+
+    def loss(self, pred_col_logits, pred_shape_logits, target_col_idx, target_shape_idx):
+        col_loss = self.col_criterion(pred_col_logits, target_col_idx)
+        shape_loss = self.shape_criterion(pred_shape_logits, target_shape_idx)
+        total_loss = col_loss + shape_loss
+        return total_loss
