@@ -55,6 +55,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     uv_to_class_net.train()
 
     count_net = net.ObjCountNet(torchDevice).to(torchDevice)
+    # count_net.load_state_dict(torch.load('active-models/countnet-model.mdl', map_location=torchDevice))
     count_net.train()
 
     params = []
@@ -184,8 +185,8 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         y_pred_col, y_pred_shape = uv_to_class_net(v1_out, y_uvs)
                         tot_loss_uv_to_class += [uv_to_class_net.loss(y_pred_col,y_pred_shape, y_col_idx, y_shape_idx)]
 
-                        p_dones, p_cols, p_shapes, p_pos = count_net(v1_out)
-                        tot_loss_countnet += [count_net.loss(p_dones, p_cols, p_shapes, p_pos, scenes)]
+                    p_dones, p_cols, p_shapes, p_pos = count_net(v1_out)
+                    tot_loss_countnet = count_net.loss(p_dones, p_cols, p_shapes, p_pos, scenes)
 
                     tot_loss_class_to_pos = torch.stack(tot_loss_class_to_pos)
                     tot_loss_class_to_pos = torch.mean(tot_loss_class_to_pos)
@@ -195,9 +196,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
                     tot_loss_uv_to_class = torch.stack(tot_loss_uv_to_class)
                     tot_loss_uv_to_class = torch.mean(tot_loss_uv_to_class)
-
-                    tot_loss_countnet = torch.stack(tot_loss_countnet)
-                    tot_loss_countnet = torch.mean(tot_loss_countnet)
 
                     print('Episode', episode, ', Loss Pos.:', tot_loss_class_to_pos.item())
 
@@ -212,6 +210,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     writer.add_scalar("Loss/Class-to-Position-Loss", tot_loss_class_to_pos.item(), episode)
                     writer.add_scalar("Loss/Position-to-Class-Loss", tot_loss_pos_to_class.item(), episode)
                     writer.add_scalar("Loss/UV-to-Class-Loss", tot_loss_uv_to_class.item(), episode)
+                    writer.add_scalar("Loss/Obj-Count-Loss", tot_loss_countnet.item(), episode)
                     episode += 1
 
                     if episode % 500 == 0:
@@ -221,6 +220,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         torch.save(pos_to_class_net.state_dict(), 'active-models/colnet-model.mdl')
                         torch.save(uv_to_class_net.state_dict(), 'active-models/uvtoclass-model.mdl')
                         torch.save(cae.state_dict(), 'active-models/cae-model.mdl')
+                        torch.save(count_net.state_dict(), 'active-models/countnet-model.mdl')
                         torch.save(optimizer.state_dict(), 'active-models/optimizer.opt')
 
 
