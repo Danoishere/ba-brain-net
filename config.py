@@ -12,4 +12,5 @@ skip_factor = 2
 
 training_path = 'D:/training-data-relative-pos-no-obstacle/'
 #training_path = '/Users/ralph/Documents/Blender/training-data-relative-pos-no-obstacle/'
+#training_path = '/cluster/home/meierr18/BA_2020/training_scenes/'
 temp_path = './.temp/'
