@@ -10,6 +10,9 @@ w,h = 128, 128
 num_queries = 8
 skip_factor = 2
 
+colors = ["red", "green", "blue", "yellow", "white", "grey", "purple"]
+shapes = ["Cube", "CubeHollow", "Diamond", "Cone", "Cylinder"]
+
 #training_path = 'D:/training-data-relative-pos-no-obstacle/'
 training_path = 'C:/Users/Dano/Documents/ZHAW/bachelor-thesis/training-data-no-obstacle/'
 #training_path = '/Users/ralph/Documents/Blender/training-data-relative-pos-no-obstacle/'

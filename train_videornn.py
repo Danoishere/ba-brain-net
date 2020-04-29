@@ -27,8 +27,8 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     sequence_length = config.sequence_length
     w, h = config.w, config.h
 
-    colors = ["red", "green", "blue", "yellow", "white", "grey", "purple"]
-    shapes = ["Cube", "CubeHollow", "Diamond", "Cone", "Cylinder"]
+    colors = config.colors
+    shapes = config.shapes
 
     cae = ConvAutoencoder().to(torchDevice)
     cae.load_state_dict(torch.load('active-models/cae-model.mdl', map_location=torchDevice))
@@ -105,6 +105,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     tot_loss_class_to_pos = []
                     tot_loss_pos_to_class = []
                     tot_loss_uv_to_class = []
+                    tot_loss_countnet = []
 
                     # Sample 10 different objects combinations from each training batch.
                     for i in range(num_queries):
@@ -183,7 +184,8 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         y_pred_col, y_pred_shape = uv_to_class_net(v1_out, y_uvs)
                         tot_loss_uv_to_class += [uv_to_class_net.loss(y_pred_col,y_pred_shape, y_col_idx, y_shape_idx)]
 
-                        l, c, s = count_net(v1_out)
+                        p_dones, p_cols, p_shapes, p_pos = count_net(v1_out)
+                        tot_loss_countnet += [count_net.loss(p_dones, p_cols, p_shapes, p_pos, scenes)]
 
                     tot_loss_class_to_pos = torch.stack(tot_loss_class_to_pos)
                     tot_loss_class_to_pos = torch.mean(tot_loss_class_to_pos)
@@ -194,11 +196,12 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     tot_loss_uv_to_class = torch.stack(tot_loss_uv_to_class)
                     tot_loss_uv_to_class = torch.mean(tot_loss_uv_to_class)
 
-                    
+                    tot_loss_countnet = torch.stack(tot_loss_countnet)
+                    tot_loss_countnet = torch.mean(tot_loss_countnet)
 
                     print('Episode', episode, ', Loss Pos.:', tot_loss_class_to_pos.item())
 
-                    tot_loss_sum = tot_loss_class_to_pos + tot_loss_pos_to_class + tot_loss_uv_to_class
+                    tot_loss_sum = tot_loss_class_to_pos + tot_loss_pos_to_class + tot_loss_uv_to_class + tot_loss_countnet
                     tot_loss_sum.backward(retain_graph=True)
                     #nn.utils.clip_grad_norm_(params, 0.025)
                     optimizer.step()
@@ -225,4 +228,3 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     plt.show()
 
 
-    

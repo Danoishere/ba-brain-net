@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from enum import Enum
 import config
+import numpy as np
 
 class Query(Enum):
     POS = 1
@@ -218,7 +219,7 @@ class ObjCountNet(nn.Module):
         self.fc3 = nn.Linear(512, 512)
         self.fc4 = nn.Linear(512, 256)
 
-        self.binary_done = nn.Linear(256, 7)
+        self.binary_done = nn.Linear(256, 1)
         self.logits_col = nn.Linear(256, 7)
         self.logits_shape = nn.Linear(256, 5)
         self.obj_pos = nn.Linear(256, 3)
@@ -249,6 +250,7 @@ class ObjCountNet(nn.Module):
         out = out.reshape(1,batch_size, -1)
         for i in range(10):
             obj_out, self.hidden = self.rnn(out, self.hidden)
+            obj_out = obj_out.reshape(batch_size, -1)
             obj_out = self.lrelu(obj_out)
             obj_out = self.fc2(obj_out)
             obj_out = self.lrelu(obj_out)
@@ -267,10 +269,65 @@ class ObjCountNet(nn.Module):
             l_shape.append(shape)
             l_pos.append(pos)
 
-        return l_done, l_col, l_shape
+        return l_done, l_col, l_shape, l_pos
 
-    def loss(self, pred_col_logits, pred_shape_logits, target_col_idx, target_shape_idx):
-        col_loss = self.col_criterion(pred_col_logits, target_col_idx)
-        shape_loss = self.shape_criterion(pred_shape_logits, target_shape_idx)
-        total_loss = col_loss + shape_loss
-        return total_loss
+    def dist_loss(self, y_pred_pos, y_target_pos_t):
+        # euclidean loss
+        # sqrt(x^2 + y^2 + z^2)
+        diff = torch.sum((y_pred_pos - y_target_pos_t)**2)
+        diff_sum_sqrt = torch.sqrt(diff)
+        loss_pos = torch.mean(diff_sum_sqrt)
+        return loss_pos
+
+    def loss(self, l_done, l_col, l_shape, l_pos, scenes):
+        scene_objects = []
+        for scene in scenes:
+            objs = []
+            for obj in scene['objects']:
+                objs.append((obj, scene['objects'][obj]))
+            scene_objects.append(objs)
+
+        loss_pos = [] #torch.tensor(0.0).to(self.torchDevice)
+        loss_col = []
+        loss_shape = []
+        loss_done = []
+        for o in range(10):
+            for s in range(len(scenes)):
+                scene = scenes[s]
+                scene_objs = scene_objects[s]
+
+                if len(scene_objs) > 0:
+                    scene_pos_pred = l_pos[o][s].clone().detach().cpu().numpy()
+
+                    closest_dist = 100
+                    closest_obj = None
+                    for scene_obj in scene_objs:
+                        scene_obj_pos = scene_obj[1]['pos']
+                        dist = np.linalg.norm(scene_obj_pos - scene_pos_pred)
+
+                        if dist < closest_dist:
+                            closest_dist = dist
+                            closest_obj = scene_obj
+
+                    obj_pos = torch.tensor(closest_obj[1]['pos']).to(self.torchDevice)
+                    obj_col_idx = torch.tensor([config.colors.index(closest_obj[1]['color-name'])], dtype=torch.long).to(self.torchDevice)
+                    obj_shape_idx = torch.tensor([config.shapes.index(closest_obj[0].split('-')[0])], dtype=torch.long).to(self.torchDevice)
+                    obj_done = torch.tensor([1.0], dtype=torch.float).to(self.torchDevice)
+
+                    loss_pos += [self.dist_loss(l_pos[o][s], obj_pos)]
+                    loss_col += [self.col_criterion(l_col[o][s].unsqueeze(0), obj_col_idx)]
+                    loss_shape += [self.shape_criterion(l_shape[o][s].unsqueeze(0), obj_shape_idx)]
+                    loss_done += [self.done_criterion(l_done[o][s], obj_done)]
+                    scene_objects[s].remove(closest_obj)
+
+                else:
+                    obj_done = torch.tensor([1.0], dtype=torch.float).to(self.torchDevice)
+                    loss_done += [self.done_criterion(l_done[o][s], obj_done)]
+
+
+        loss_pos = torch.mean(torch.stack(loss_pos))
+        loss_col = torch.mean(torch.stack(loss_col))
+        loss_shape = torch.mean(torch.stack(loss_shape))
+        loss_done = torch.mean(torch.stack(loss_done))
+                
+        return loss_pos + loss_col + loss_shape + loss_done
