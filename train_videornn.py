@@ -65,6 +65,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     params += list(class_to_pos_net.parameters())
     params += list(pos_to_class_net.parameters())
     params += list(uv_to_class_net.parameters())
+    params += list(count_net.parameters())
     
     optimizer = torch.optim.Adam(params, lr=lr)
     #optimizer.load_state_dict(torch.load('active-models/optimizer.opt'))
@@ -136,7 +137,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                             obj_rel_pos = last_frame_transf_mat_inv @ np.array(obj_pos + [1])
                             obj_rel_pos = obj_rel_pos[:3]
 
-                            
 
                             obj_col_idx = colors.index(scene_objects[rnd_obj]['color-name'])
                             obj_shape_idx = shapes.index(rnd_obj.split("-")[0])
@@ -163,6 +163,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                             plt.show()
                             """
                             
+                            
 
 
                         # oh = one-hot
@@ -186,7 +187,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         tot_loss_uv_to_class += [uv_to_class_net.loss(y_pred_col,y_pred_shape, y_col_idx, y_shape_idx)]
 
                     p_dones, p_cols, p_shapes, p_pos = count_net(v1_out)
-                    tot_loss_countnet = count_net.loss(p_dones, p_cols, p_shapes, p_pos, scenes)
+                    tot_loss_countnet = count_net.loss(p_dones, p_cols, p_shapes, p_pos, scenes, last_frame)
 
                     tot_loss_class_to_pos = torch.stack(tot_loss_class_to_pos)
                     tot_loss_class_to_pos = torch.mean(tot_loss_class_to_pos)
@@ -205,7 +206,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     optimizer.step()
                     
                     episodes.append(episode)
-                    #losses.append(loss.item()/num_queries)
+                    #losses.append(loss.item()/num_l_has_mores)
 
                     writer.add_scalar("Loss/Class-to-Position-Loss", tot_loss_class_to_pos.item(), episode)
                     writer.add_scalar("Loss/Position-to-Class-Loss", tot_loss_pos_to_class.item(), episode)

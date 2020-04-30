@@ -279,7 +279,7 @@ class ObjCountNet(nn.Module):
         loss_pos = torch.mean(diff_sum_sqrt)
         return loss_pos
 
-    def loss(self, l_done, l_col, l_shape, l_pos, scenes):
+    def loss(self, l_has_more, l_col, l_shape, l_pos, scenes, last_frame):
         scene_objects = []
         for scene in scenes:
             objs = []
@@ -290,7 +290,8 @@ class ObjCountNet(nn.Module):
         loss_pos = [] #torch.tensor(0.0).to(self.torchDevice)
         loss_col = []
         loss_shape = []
-        loss_done = []
+        # 1 = found more, 0 = all objects outputted
+        loss_has_more = []
         for o in range(10):
             for s in range(len(scenes)):
                 scene = scenes[s]
@@ -298,11 +299,15 @@ class ObjCountNet(nn.Module):
 
                 if len(scene_objs) > 0:
                     scene_pos_pred = l_pos[o][s].clone().detach().cpu().numpy()
-
+                    scene_cam_mat = np.array(scene["cam_base_matricies"][last_frame])
+                    scene_cam_mat = np.linalg.inv(scene_cam_mat)
+                
                     closest_dist = 100
                     closest_obj = None
+
                     for scene_obj in scene_objs:
-                        scene_obj_pos = scene_obj[1]['pos']
+                        scene_obj_pos = scene_cam_mat @ np.array(scene_obj[1]['pos'] + [1.0])
+                        scene_obj_pos = scene_obj_pos[:3]
                         dist = np.linalg.norm(scene_obj_pos - scene_pos_pred)
 
                         if dist < closest_dist:
@@ -312,22 +317,22 @@ class ObjCountNet(nn.Module):
                     obj_pos = torch.tensor(closest_obj[1]['pos']).to(self.torchDevice)
                     obj_col_idx = torch.tensor([config.colors.index(closest_obj[1]['color-name'])], dtype=torch.long).to(self.torchDevice)
                     obj_shape_idx = torch.tensor([config.shapes.index(closest_obj[0].split('-')[0])], dtype=torch.long).to(self.torchDevice)
-                    obj_done = torch.tensor([1.0], dtype=torch.float).to(self.torchDevice)
+                    obj_has_more = torch.tensor([1.0], dtype=torch.float).to(self.torchDevice)
 
                     loss_pos += [self.dist_loss(l_pos[o][s], obj_pos)]
                     loss_col += [self.col_criterion(l_col[o][s].unsqueeze(0), obj_col_idx)]
                     loss_shape += [self.shape_criterion(l_shape[o][s].unsqueeze(0), obj_shape_idx)]
-                    loss_done += [self.done_criterion(l_done[o][s], obj_done)]
+                    loss_has_more += [self.done_criterion(l_has_more[o][s], obj_has_more)]
                     scene_objects[s].remove(closest_obj)
 
                 else:
-                    obj_done = torch.tensor([1.0], dtype=torch.float).to(self.torchDevice)
-                    loss_done += [self.done_criterion(l_done[o][s], obj_done)]
+                    obj_has_more = torch.tensor([0.0], dtype=torch.float).to(self.torchDevice)
+                    loss_has_more += [self.done_criterion(l_has_more[o][s], obj_has_more)]
 
 
         loss_pos = torch.mean(torch.stack(loss_pos))
         loss_col = torch.mean(torch.stack(loss_col))
         loss_shape = torch.mean(torch.stack(loss_shape))
-        loss_done = torch.mean(torch.stack(loss_done))
+        loss_has_more = torch.mean(torch.stack(loss_has_more))
                 
-        return loss_pos + loss_col + loss_shape + loss_done
+        return loss_pos + loss_col + loss_shape + loss_has_more
