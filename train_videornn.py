@@ -70,8 +70,8 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     params += list(pos_to_class_net.parameters())
     params += list(uv_to_class_net.parameters())
     params += list(count_net.parameters())
-	params += list(class_has_above_net.parameters())
-    
+    params += list(class_has_above_net.parameters())
+
     optimizer = torch.optim.Adam(params, lr=lr)
     #optimizer.load_state_dict(torch.load('active-models/optimizer.opt'))
     losses = []
@@ -230,7 +230,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     
                     episodes.append(episode)
                     #losses.append(loss.item()/num_l_has_mores)
-
                     writer.add_scalar("Loss/Class-to-Position-Loss", tot_loss_class_to_pos.item(), episode)
                     writer.add_scalar("Loss/Position-to-Class-Loss", tot_loss_pos_to_class.item(), episode)
                     writer.add_scalar("Loss/UV-to-Class-Loss", tot_loss_uv_to_class.item(), episode)
@@ -252,5 +251,3 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
     plt.plot(episodes, losses)
     plt.show()
-
-

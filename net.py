@@ -390,4 +390,3 @@ class ClassHasAboveNet(nn.Module):
         diff_sum_sqrt = torch.sqrt(diff)
         loss_pos = torch.mean(diff_sum_sqrt)
         return loss_pos
-        return loss_pos
