@@ -339,7 +339,7 @@ class ObjCountNet(nn.Module):
 
 # (vent_in, dors_in, shape, col) -> hasAboveNet
 class ClassHasAboveNet(nn.Module):
-    def __init__(self):
+    def __init__(self, torchDevice):
         super(ClassHasAboveNet, self).__init__()
         self.lrelu = nn.LeakyReLU()
         self.fc1 = nn.Linear(2048 + 256, 2048)
@@ -354,6 +354,7 @@ class ClassHasAboveNet(nn.Module):
         self.side_fc3 = nn.Linear(256, 256)
 
         self.logits_above = nn.Linear(3,1) #TODO:check that
+        self.above_criterion = nn.BCEWithLogitsLoss().to(torchDevice)
 
 
     def forward(self, v1_in, col, shape):
@@ -377,16 +378,11 @@ class ClassHasAboveNet(nn.Module):
         out = self.fc5(out)
         out = self.lrelu(out)
         out = self.fc6(out)
-
+        out = self.lrelu(out)
         out = self.logits_above(out)
-
+        out = out.reshape(batch_size)
         return out
 
 
     def loss(self, y_pred_has_above, y_target_has_above_t):
-        # euclidean loss
-        # sqrt(x^2 + y^2 + z^2)
-        diff = torch.sum((y_pred_has_above - y_target_has_above_t)**2, dim=1)
-        diff_sum_sqrt = torch.sqrt(diff)
-        loss_pos = torch.mean(diff_sum_sqrt)
-        return loss_pos
+        return self.above_criterion(y_pred_has_above, y_target_has_above_t)

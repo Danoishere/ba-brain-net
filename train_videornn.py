@@ -58,7 +58,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     # count_net.load_state_dict(torch.load('active-models/countnet-model.mdl', map_location=torchDevice))
     count_net.train()
 
-    class_has_above_net = net.ClassHasAboveNet().to(torchDevice)
+    class_has_above_net = net.ClassHasAboveNet(torchDevice).to(torchDevice)
     #class_has_above_net.load_state_dict(torch.load('active-models/classabove-model.mdl', map_location=torchDevice))
     class_has_above_net.train()
 
@@ -149,8 +149,8 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                             obj_col_idx = colors.index(scene_objects[rnd_obj]['color-name'])
                             obj_shape_idx = shapes.index(rnd_obj.split("-")[0])
                             
-                            obj_has_above = int('is_above' in scene_objects[rnd_obj].keys())
-                            obj_has_below = int('is_below' in scene_objects[rnd_obj].keys())
+                            obj_has_above = float(int('is_above' in scene_objects[rnd_obj].keys()))
+                            obj_has_below = float(int('is_below' in scene_objects[rnd_obj].keys()))
                             y_target_has_above.append(obj_has_above)
                             y_target_has_below.append(obj_has_below)
 
