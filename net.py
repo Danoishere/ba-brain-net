@@ -349,16 +349,17 @@ class ClassHasAboveNet(nn.Module):
         self.fc5 = nn.Linear(1024, 64)
         self.fc6 = nn.Linear(64, 3)
 
-        self.side_fc1 = nn.Linear(12, 64)
+        self.side_fc1 = nn.Linear(15, 64)
         self.side_fc2 = nn.Linear(64, 256)
         self.side_fc3 = nn.Linear(256, 256)
 
-        self.logits_above = nn.Linear(3,1) #TODO:check that
-        self.above_criterion = nn.BCEWithLogitsLoss().to(torchDevice)
+        #self.logits_belowAbove = nn.Linear(3,1) #TODO:check that
+        #self.belowAbove_criterion = nn.BCEWithLogitsLoss().to(torchDevice)
+        self.belowAbove_criterion = nn.CrossEntropyLoss().to(torchDevice)
 
 
-    def forward(self, v1_in, col, shape):
-        side = torch.cat((col, shape), 1)
+    def forward(self, v1_in, below_above, col, shape):
+        side = torch.cat((below_above, col, shape), 1)
         side = self.side_fc1(side)
         side = self.lrelu(side)
         side = self.side_fc2(side)
@@ -378,11 +379,20 @@ class ClassHasAboveNet(nn.Module):
         out = self.fc5(out)
         out = self.lrelu(out)
         out = self.fc6(out)
-        out = self.lrelu(out)
-        out = self.logits_above(out)
-        out = out.reshape(batch_size)
+        #out = self.lrelu(out)
+
+        #out = self.logits_belowAbove(out)
+        #out = out.reshape(batch_size)
         return out
 
 
-    def loss(self, y_pred_has_above, y_target_has_above_t):
-        return self.above_criterion(y_pred_has_above, y_target_has_above_t)
+    def loss(self, y_pred_has_below_above, y_target_has_below_above_t):
+        #return self.belowAbove_criterion(y_pred_has_below_above, y_target_has_above_t)
+        
+        # euclidean loss
+        # sqrt(x^2 + y^2 + z^2)
+        # diff = torch.sum((y_pred_has_below_above - y_target_has_above_t)**2, dim=1)
+        # diff_sum_sqrt = torch.sqrt(diff)
+        # loss_pos = torch.mean(diff_sum_sqrt)
+        # return loss_pos
+        return self.belowAbove_criterion(y_pred_has_below_above, y_target_has_below_above_t)
