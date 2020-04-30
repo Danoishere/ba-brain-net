@@ -58,6 +58,10 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     # count_net.load_state_dict(torch.load('active-models/countnet-model.mdl', map_location=torchDevice))
     count_net.train()
 
+    class_has_above_net = net.ClassHasAboveNet().to(torchDevice)
+    #class_has_above_net.load_state_dict(torch.load('active-models/classabove-model.mdl', map_location=torchDevice))
+    class_has_above_net.train()
+
     params = []
     params += list(cae.parameters())
     params += list(lgn_net.parameters())
@@ -65,6 +69,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     params += list(class_to_pos_net.parameters())
     params += list(pos_to_class_net.parameters())
     params += list(uv_to_class_net.parameters())
+    params += list(class_has_above_net.parameters())
     
     optimizer = torch.optim.Adam(params, lr=lr)
     #optimizer.load_state_dict(torch.load('active-models/optimizer.opt'))
@@ -107,12 +112,15 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     tot_loss_pos_to_class = []
                     tot_loss_uv_to_class = []
                     tot_loss_countnet = []
+                    tot_loss_class_has_above = []
 
                     # Sample 10 different objects combinations from each training batch.
                     for i in range(num_queries):
                         # Predict color, based on location
                         # y_target_pos = []
                         y_target_rel_pos = []
+                        y_target_has_above = []
+                        y_target_has_below = []
                         
                         all_uvs = []
                         obj_col_onehots = []
@@ -136,10 +144,14 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                             obj_rel_pos = last_frame_transf_mat_inv @ np.array(obj_pos + [1])
                             obj_rel_pos = obj_rel_pos[:3]
 
-                            
-
                             obj_col_idx = colors.index(scene_objects[rnd_obj]['color-name'])
                             obj_shape_idx = shapes.index(rnd_obj.split("-")[0])
+                            
+                            obj_has_above = int('is_above' in scene_objects[rnd_obj].keys())
+                            obj_has_below = int('is_below' in scene_objects[rnd_obj].keys())
+                            y_target_has_above.append(obj_has_above)
+                            y_target_has_below.append(obj_has_below)
+
 
                             obj_col_oh = np.zeros(len(colors))
                             obj_col_oh[obj_col_idx] = 1.0
@@ -172,6 +184,8 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         y_col_idx = torch.tensor(obj_col_indices, dtype=torch.long).to(torchDevice)
                         y_shape_idx = torch.tensor(obj_shape_indices, dtype=torch.long).to(torchDevice)
                         y_uvs = torch.tensor(all_uvs, requires_grad=True, dtype=torch.float32).to(torchDevice)
+                        y_target_has_above_t = torch.tensor(y_target_has_above, requires_grad=True, dtype=torch.float32).to(torchDevice)#TODO: check if int32
+
 
                         # Find position loss
                         y_pred_pos = class_to_pos_net(v1_out, y_col_oh, y_shape_oh)
@@ -185,6 +199,10 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         y_pred_col, y_pred_shape = uv_to_class_net(v1_out, y_uvs)
                         tot_loss_uv_to_class += [uv_to_class_net.loss(y_pred_col,y_pred_shape, y_col_idx, y_shape_idx)]
 
+                        # Find hasAbove loss
+                        y_pred_has_above = class_has_above_net(v1_out, y_col_oh, y_shape_oh)
+                        tot_loss_class_has_above += [class_has_above_net.loss(y_pred_has_above,y_target_has_above_t)]
+
                     p_dones, p_cols, p_shapes, p_pos = count_net(v1_out)
                     tot_loss_countnet = count_net.loss(p_dones, p_cols, p_shapes, p_pos, scenes)
 
@@ -197,9 +215,12 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     tot_loss_uv_to_class = torch.stack(tot_loss_uv_to_class)
                     tot_loss_uv_to_class = torch.mean(tot_loss_uv_to_class)
 
+                    tot_loss_class_has_above = torch.stack(tot_loss_class_has_above)
+                    tot_loss_class_has_above = torch.mean(tot_loss_class_has_above)
+
                     print('Episode', episode, ', Loss Pos.:', tot_loss_class_to_pos.item())
 
-                    tot_loss_sum = tot_loss_class_to_pos + tot_loss_pos_to_class + tot_loss_uv_to_class + tot_loss_countnet
+                    tot_loss_sum = tot_loss_class_to_pos + tot_loss_pos_to_class + tot_loss_uv_to_class + tot_loss_countnet + tot_loss_class_has_above
                     tot_loss_sum.backward(retain_graph=True)
                     #nn.utils.clip_grad_norm_(params, 0.025)
                     optimizer.step()
@@ -211,6 +232,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     writer.add_scalar("Loss/Position-to-Class-Loss", tot_loss_pos_to_class.item(), episode)
                     writer.add_scalar("Loss/UV-to-Class-Loss", tot_loss_uv_to_class.item(), episode)
                     writer.add_scalar("Loss/Obj-Count-Loss", tot_loss_countnet.item(), episode)
+                    writer.add_scalar("Loss/Class-has-Above-Loss", tot_loss_class_has_above.item(), episode)
                     episode += 1
 
                     if episode % 500 == 0:
@@ -221,6 +243,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         torch.save(uv_to_class_net.state_dict(), 'active-models/uvtoclass-model.mdl')
                         torch.save(cae.state_dict(), 'active-models/cae-model.mdl')
                         torch.save(count_net.state_dict(), 'active-models/countnet-model.mdl')
+                        #torch.save(class_has_above_net.state_dict(), 'active-models/classabovenet-model.mdl')
                         torch.save(optimizer.state_dict(), 'active-models/optimizer.opt')
 
 

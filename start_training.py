@@ -44,7 +44,7 @@ if __name__ == '__main__':
     else:
         args.device = torch.device('cpu')
 
-    print("Going to use" + str(args.device))
+    print("Going to use " + str(args.device))
     # Create the Queue object
     queue = Queue(maxsize=3)
      
