@@ -60,7 +60,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     count_net.train()
 
     class_has_below_above_net = net.ClassHasObjectBelowAboveNet(torchDevice).to(torchDevice)
-    #class_has_above_net.load_state_dict(torch.load('active-models/classabove-model.mdl', map_location=torchDevice))
+    #class_has_below_above_net.load_state_dict(torch.load('active-models/classbelowabovenet-model.mdl', map_location=torchDevice))
     class_has_below_above_net.train()
 
     params = []
