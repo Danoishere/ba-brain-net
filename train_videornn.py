@@ -56,12 +56,12 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     uv_to_class_net.train()
 
     count_net = net.ObjCountNet(torchDevice).to(torchDevice)
-    # count_net.load_state_dict(torch.load('active-models/countnet-model.mdl', map_location=torchDevice))
+    count_net.load_state_dict(torch.load('active-models/countnet-model.mdl', map_location=torchDevice))
     count_net.train()
 
-    class_has_above_net = net.ClassHasAboveNet(torchDevice).to(torchDevice)
+    class_has_below_above_net = net.ClassHasObjectBelowAboveNet(torchDevice).to(torchDevice)
     #class_has_above_net.load_state_dict(torch.load('active-models/classabove-model.mdl', map_location=torchDevice))
-    class_has_above_net.train()
+    class_has_below_above_net.train()
 
     params = []
     params += list(cae.parameters())
@@ -71,7 +71,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     params += list(pos_to_class_net.parameters())
     params += list(uv_to_class_net.parameters())
     params += list(count_net.parameters())
-    params += list(class_has_above_net.parameters())
+    params += list(class_has_below_above_net.parameters())
 
     optimizer = torch.optim.Adam(params, lr=lr)
     #optimizer.load_state_dict(torch.load('active-models/optimizer.opt'))
@@ -169,10 +169,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                                 below_above_idx = belowAbove.index("standalone")
                                 below_above_oh[below_above_idx] = 1.0
 
-   
-                            #y_target_has_above.append(obj_has_above)
-                            #y_target_has_below.append(obj_has_below)
-
 
                             obj_col_oh = np.zeros(len(colors))
                             obj_col_oh[obj_col_idx] = 1.0
@@ -226,8 +222,8 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         tot_loss_uv_to_class += [uv_to_class_net.loss(y_pred_col,y_pred_shape, y_col_idx, y_shape_idx)]
 
                         # Find hasAbove loss
-                        y_pred_has_below_above = class_has_above_net(v1_out, y_has_below_above_oh, y_col_oh, y_shape_oh)
-                        tot_loss_class_has_below_above += [class_has_above_net.loss(y_pred_has_below_above,y_has_below_above_idx)]
+                        y_pred_has_below_above = class_has_below_above_net(v1_out, y_has_below_above_oh, y_col_oh, y_shape_oh)
+                        tot_loss_class_has_below_above += [class_has_below_above_net.loss(y_pred_has_below_above,y_has_below_above_idx)]
 
                     p_dones, p_cols, p_shapes, p_pos = count_net(v1_out)
                     tot_loss_countnet = count_net.loss(p_dones, p_cols, p_shapes, p_pos, scenes, last_frame)
@@ -268,7 +264,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         torch.save(uv_to_class_net.state_dict(), 'active-models/uvtoclass-model.mdl')
                         torch.save(cae.state_dict(), 'active-models/cae-model.mdl')
                         torch.save(count_net.state_dict(), 'active-models/countnet-model.mdl')
-                        #torch.save(class_has_above_net.state_dict(), 'active-models/classbelowabovenet-model.mdl')
+                        torch.save(class_has_below_above_net.state_dict(), 'active-models/classbelowabovenet-model.mdl')
                         torch.save(optimizer.state_dict(), 'active-models/optimizer.opt')
 
 
