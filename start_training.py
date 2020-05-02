@@ -35,6 +35,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='BA>>Programm')
     parser.add_argument('--ae', help='Run auto-encoder', action='store_true')
     parser.add_argument('--vrnn', help='Video RNN', action='store_true')
+    parser.add_argument('--rl', help='Reinforcement Learning for Next Best View', action='store_true')
     parser.add_argument('--disable-cuda', action='store_true',
                     help='Disable CUDA')
     args = parser.parse_args()
@@ -43,6 +44,9 @@ if __name__ == '__main__':
         args.device = torch.device('cuda')
     else:
         args.device = torch.device('cpu')
+
+
+    
 
     print("Going to use " + str(args.device))
     # Create the Queue object
@@ -57,6 +61,8 @@ if __name__ == '__main__':
     if args.ae:
         train_autoencoder(queue, lock, args.device)
     if args.vrnn:
+         train_video_rnn(queue, lock, args.device)
+    if args.rl:
         train_video_rnn(queue, lock, args.device)
 
     producer.join()

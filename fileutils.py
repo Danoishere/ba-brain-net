@@ -12,14 +12,6 @@ import torch.nn as nn
 import numpy as np
 import config
 
-training_path = config.training_path
-temp_path = config.temp_path
-
-batch_size = config.batch_size
-sequence_length = config.sequence_length
-w, h = config.w, config.h
-# zip_files = list(glob.glob(training_path + "*.zip"))
-
 pool = ThreadPool(10)
 process_suffix = str(os.getpid()) + "/" 
 
@@ -40,7 +32,7 @@ def col_loss(col, col_predict):
 
 
 def reshape_frame(rgb, depth):
-    frame_input = np.zeros((4,h,w))
+    frame_input = np.zeros((4,config.h,config.w))
     frame_input[0,:,:] = rgb[:,:,0]
     frame_input[1,:,:] = rgb[:,:,1]
     frame_input[2,:,:] = rgb[:,:,2]
@@ -50,24 +42,24 @@ def reshape_frame(rgb, depth):
 
 
 def load_batch():
-    batch_x = np.zeros((sequence_length, batch_size, 4, h, w))
+    batch_x = np.zeros((config.sequence_length, config.batch_size, 4, config.h, config.w))
     batch_idx = 0
 
-    zip_files = list(glob.glob(training_path + "*.zip"))
+    zip_files = list(glob.glob(config.training_path + "*.zip"))
 
     scenes = []
-    selected_files = random.sample(zip_files, batch_size)
+    selected_files = random.sample(zip_files, config.batch_size)
 
     start = time.time()
     for file in selected_files:
         scene_id = os.path.basename(file).split(".")[0]
-        extract_zip(file, temp_path)
+        extract_zip(file, config.temp_path)
 
         rgb_frames, depth_frames, scene_data = load_scene_data(scene_id)
         is_reversed = np.random.random() < 0.5
 
-        frame_input = np.zeros((4,w,h))
-        for frame in range(sequence_length):
+        frame_input = np.zeros((4,config.w,config.h))
+        for frame in range(config.sequence_length):
             frame_idx = frame
             if is_reversed:
                 frame_idx = -frame - 1
@@ -93,11 +85,11 @@ def load_scene_data(scene_id):
     np_file = scene_id + "-combined.npz"
 
     start = time.time()
-    with np.load(temp_path + process_suffix +  np_file) as frames:
+    with np.load(config.temp_path + process_suffix +  np_file) as frames:
         rgb_frames = frames['rgb']
         depth_frames = frames['depth']
 
-    with open(temp_path + process_suffix + json_file) as json_file_p:
+    with open(config.temp_path + process_suffix + json_file) as json_file_p:
         scene_data = json.load(json_file_p)
 
 
@@ -106,7 +98,7 @@ def load_scene_data(scene_id):
     depth_frames = np.tanh(0.2*depth_frames)
     depth_frames[np.isnan(depth_frames)] = 1.0
 
-    os.remove(temp_path  + process_suffix + np_file)
-    os.remove(temp_path  + process_suffix + json_file)
+    os.remove(config.temp_path  + process_suffix + np_file)
+    os.remove(config.temp_path  + process_suffix + json_file)
 
     return rgb_frames, depth_frames, scene_data
