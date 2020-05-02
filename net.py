@@ -336,3 +336,56 @@ class ObjCountNet(nn.Module):
         loss_has_more = torch.mean(torch.stack(loss_has_more))
                 
         return loss_pos + loss_col + loss_shape + loss_has_more
+
+# Next-Best-View Reinforcement Learning Net
+class NextBestViewRLNet(nn.Module):
+    def __init__(self, torchDevice):
+        super(NextBestViewRLNet, self).__init__()
+        self.policy_criterion = nn.CrossEntropyLoss().to(torchDevice)
+        self.value_criterion = nn.MSELoss()
+        self.lrelu = nn.LeakyReLU()
+        self.fc1_policy = nn.Linear(2048 + 2, 1024)
+        self.fc2_policy = nn.Linear(1024, 1024)
+        self.fc3_policy = nn.Linear(1024, 512)
+        self.fc4_policy = nn.Linear(512, 64)
+
+        self.fc1_value = nn.Linear(2048 + 2, 1024)
+        self.fc2_value = nn.Linear(1024, 1024)
+        self.fc3_value = nn.Linear(1024, 512)
+        self.fc4_value = nn.Linear(512, 64)
+
+        self.logits_policy = nn.Linear(64, 7)
+        self.out_value = nn.Linear(64, 1)
+
+
+    # give position, receive color
+    def forward(self, v1_in, uv):
+        out_policy = torch.cat((v1_in, uv), 1)
+        out_policy = self.fc1_policy(out_policy)
+        out_policy = self.lrelu(out_policy)
+        out_policy = self.fc2_policy(out_policy)
+        out_policy = self.lrelu(out_policy)
+        out_policy = self.fc3_policy(out_policy)
+        out_policy = self.lrelu(out_policy)
+        out_policy = self.fc4_policy(out_policy)
+        out_policy = self.lrelu(out_policy)        
+        logits_policy = self.logits_policy(out_policy)
+
+        out_value = torch.cat((v1_in, uv), 1)
+        out_value = self.fc1_policy(out_value)
+        out_value = self.lrelu(out_value)
+        out_value = self.fc2_policy(out_value)
+        out_value = self.lrelu(out_value)
+        out_value = self.fc3_policy(out_value)
+        out_value = self.lrelu(out_value)
+        out_value = self.fc4_policy(out_value)
+        out_value = self.lrelu(out_value)        
+        out_value = self.out_value(out_value)
+
+        return logits_policy, out_value
+
+    def loss(self, pred_col_logits, pred_shape_logits, target_col_idx, target_shape_idx):
+        col_loss = self.policy_criterion(pred_col_logits, target_col_idx)
+        shape_loss = self.value_criterion(pred_shape_logits, target_shape_idx)
+        total_loss = col_loss + shape_loss
+        return total_loss
