@@ -16,7 +16,7 @@ from datetime import datetime
 import config
 
 
-def train_video_rnn(queue, lock, torchDevice, load_model=True):
+def train_rl(queue, lock, torchDevice, load_model=True):
 
     now = datetime.now()
     current_time = now.strftime("-%H-%M-%S")
@@ -84,27 +84,26 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
     
     while True:
-        last_frame = 0
+        frame = 0
         batch_x, scenes = queue.get()
         # Pass batch frame by frame
 
         for repetition in range(3):
-            start_frame = randint(0, sequence_length - 1)
+            frame = randint(0, sequence_length - 1)
             clip_length = randint(4, 8) + 1
             
             optimizer.zero_grad()
             lgn_net.init_hidden(torchDevice)
 
             clip_frame = 0
-            for frame in range(start_frame, start_frame + clip_length):
+            while clip_frame < 10:
                 clip_frame += 1
-                current_frame = frame % sequence_length # int(frame*skip + offset)
-                print(current_frame)
-                frame_input = torch.tensor(batch_x[current_frame], requires_grad=True).float().to(torchDevice)
+                frame = frame % sequence_length
+                print(frame)
+                frame_input = torch.tensor(batch_x[frame], requires_grad=True).float().to(torchDevice)
                 encoded = cae.encode(frame_input)
                 output = encoded.reshape(batch_size, -1)
                 output = lgn_net(output)
-                last_frame = current_frame
 
                 if clip_frame > 4:
 
@@ -138,10 +137,10 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                             scene_objects = scene["objects"]
                             rnd_obj = np.random.choice(list(scene_objects.keys()))
 
-                            last_frame_transf_mat = np.array(scene["cam_base_matricies"][last_frame])
+                            last_frame_transf_mat = np.array(scene["cam_base_matricies"][frame])
                             last_frame_transf_mat_inv = np.linalg.inv(last_frame_transf_mat)
 
-                            last_frame_uv = scene["ss_objs"][last_frame][rnd_obj]
+                            last_frame_uv = scene["ss_objs"][frame][rnd_obj]
                             all_uvs.append([last_frame_uv["screen_x"], last_frame_uv["screen_y"]])
                             
                             obj_pos = scene_objects[rnd_obj]['pos']
@@ -226,7 +225,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         tot_loss_class_has_below_above += [class_has_below_above_net.loss(y_pred_has_below_above,y_has_below_above_idx)]
 
                     p_dones, p_cols, p_shapes, p_pos = count_net(v1_out)
-                    tot_loss_countnet = count_net.loss(p_dones, p_cols, p_shapes, p_pos, scenes, last_frame)
+                    tot_loss_countnet = count_net.loss(p_dones, p_cols, p_shapes, p_pos, scenes, frame)
 
                     tot_loss_class_to_pos = torch.stack(tot_loss_class_to_pos)
                     tot_loss_class_to_pos = torch.mean(tot_loss_class_to_pos)

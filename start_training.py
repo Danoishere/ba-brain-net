@@ -4,7 +4,7 @@ import random
 from multiprocessing import Process, Queue, Lock
 from fileutils import load_batch
 from train_autoencoder import train_autoencoder
-from train_videornn import train_video_rnn
+from train_rl import train_rl
 import argparse
 import torch
 
@@ -57,7 +57,7 @@ if __name__ == '__main__':
     if args.ae:
         train_autoencoder(queue, lock, args.device)
     if args.vrnn:
-        train_video_rnn(queue, lock, args.device)
+        train_rl(queue, lock, args.device)
 
     producer.join()
  

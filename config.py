@@ -13,6 +13,7 @@ skip_factor = 2
 colors = ["red", "green", "blue", "yellow", "white", "grey", "purple"]
 shapes = ["Cube", "CubeHollow", "Diamond", "Cone", "Cylinder"]
 belowAbove = ["standalone", "below", "above"]
+actions = ["5 left", "2 left", "1 left", "stay here","1 right","2 right","5 right"]
 
 #training_path = 'D:/training-data-relative-pos-no-obstacle/'
 #training_path = 'C:/Users/Dano/Documents/ZHAW/bachelor-thesis/training-data-no-obstacle/'
