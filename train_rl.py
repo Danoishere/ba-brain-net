@@ -14,6 +14,26 @@ from autoencoder import ConvAutoencoder
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 import config
+from memory import Memory
+from torch.distributions import Categorical
+
+
+def action_to_frame_offset(action):
+    if action == 0:
+        return -5
+    if action == 1:
+        return -2
+    if action == 2:
+        return -1
+    if action == 3:
+        return 0
+    if action == 4:
+        return 1
+    if action == 5:
+        return 2
+    if action == 6:
+        return 5
+
 
 
 def train_rl(queue, lock, torchDevice, load_model=True):
@@ -63,6 +83,10 @@ def train_rl(queue, lock, torchDevice, load_model=True):
     #class_has_below_above_net.load_state_dict(torch.load('active-models/classbelowabovenet-model.mdl', map_location=torchDevice))
     class_has_below_above_net.train()
 
+    rl_net = net.NextBestViewRLNet(torchDevice).to(torchDevice)
+    #rl_net.load_state_dict(torch.load('active-models/rl-model.mdl', map_location=torchDevice))
+    rl_net.train()
+
     params = []
     params += list(cae.parameters())
     params += list(lgn_net.parameters())
@@ -72,6 +96,7 @@ def train_rl(queue, lock, torchDevice, load_model=True):
     params += list(uv_to_class_net.parameters())
     params += list(count_net.parameters())
     params += list(class_has_below_above_net.parameters())
+    params += list(rl_net.parameters())
 
     optimizer = torch.optim.Adam(params, lr=lr)
     #optimizer.load_state_dict(torch.load('active-models/optimizer.opt'))
@@ -89,6 +114,9 @@ def train_rl(queue, lock, torchDevice, load_model=True):
         # Pass batch frame by frame
 
         for repetition in range(3):
+
+            memory = Memory()
+
             frame = randint(0, sequence_length - 1)
             clip_length = randint(4, 8) + 1
             
@@ -96,6 +124,9 @@ def train_rl(queue, lock, torchDevice, load_model=True):
             lgn_net.init_hidden(torchDevice)
 
             clip_frame = 0
+            initial_action_made = False
+            last_loss = 0.0
+
             while clip_frame < 10:
                 clip_frame += 1
                 frame = frame % sequence_length
@@ -105,8 +136,8 @@ def train_rl(queue, lock, torchDevice, load_model=True):
                 output = encoded.reshape(batch_size, -1)
                 output = lgn_net(output)
 
-                if clip_frame > 4:
-
+                tot_loss_sum = torch.tensor(0.0).to(torchDevice)
+                if clip_frame > config.init_frames:
                     v1_out = visual_cortex_net(output)
 
                     tot_loss_class_to_pos = []
@@ -241,31 +272,46 @@ def train_rl(queue, lock, torchDevice, load_model=True):
 
                     print('Episode', episode, ', Loss Pos.:', tot_loss_class_to_pos.item())
 
-                    tot_loss_sum = tot_loss_class_to_pos + tot_loss_pos_to_class + tot_loss_uv_to_class + tot_loss_countnet + tot_loss_class_has_below_above
+                    tot_loss_sum += tot_loss_class_to_pos + tot_loss_pos_to_class + tot_loss_uv_to_class + tot_loss_countnet + tot_loss_class_has_below_above
+                
+                state = frame_input
+                policy_logits, value = rl_net(output)
+                m = Categorical(logits=policy_logits)
+                action = m.sample()
+
+                if initial_action_made:
+                    reward = last_loss - tot_loss_sum.item()
+                    last_loss = tot_loss_sum.item()
+
+                    loss_rl = -m.log_prob(action) * reward
+                    tot_loss_sum += loss_rl.squeeze(0)
+
                     tot_loss_sum.backward(retain_graph=True)
                     #nn.utils.clip_grad_norm_(params, 0.025)
                     optimizer.step()
-                    
-                    episodes.append(episode)
-                    #losses.append(loss.item()/num_l_has_mores)
-                    writer.add_scalar("Loss/Class-to-Position-Loss", tot_loss_class_to_pos.item(), episode)
-                    writer.add_scalar("Loss/Position-to-Class-Loss", tot_loss_pos_to_class.item(), episode)
-                    writer.add_scalar("Loss/UV-to-Class-Loss", tot_loss_uv_to_class.item(), episode)
-                    writer.add_scalar("Loss/Obj-Count-Loss", tot_loss_countnet.item(), episode)
-                    writer.add_scalar("Loss/Class-has-Above-Loss", tot_loss_class_has_below_above.item(), episode)
-                    episode += 1
+                    if clip_frame > config.init_frames:
+                        episodes.append(episode)
+                        #losses.append(loss.item()/num_l_has_mores)
+                        writer.add_scalar("Loss/Class-to-Position-Loss", tot_loss_class_to_pos.item(), episode)
+                        writer.add_scalar("Loss/Position-to-Class-Loss", tot_loss_pos_to_class.item(), episode)
+                        writer.add_scalar("Loss/UV-to-Class-Loss", tot_loss_uv_to_class.item(), episode)
+                        writer.add_scalar("Loss/Obj-Count-Loss", tot_loss_countnet.item(), episode)
+                        writer.add_scalar("Loss/Class-has-Above-Loss", tot_loss_class_has_below_above.item(), episode)
+                        episode += 1
 
-                    if episode % 500 == 0:
-                        torch.save(lgn_net.state_dict(), 'active-models/lgn-net.mdl')
-                        torch.save(visual_cortex_net.state_dict(), 'active-models/visual-cortex-net.mdl')
-                        torch.save(class_to_pos_net.state_dict(), 'active-models/posnet-model.mdl')
-                        torch.save(pos_to_class_net.state_dict(), 'active-models/colnet-model.mdl')
-                        torch.save(uv_to_class_net.state_dict(), 'active-models/uvtoclass-model.mdl')
-                        torch.save(cae.state_dict(), 'active-models/cae-model.mdl')
-                        torch.save(count_net.state_dict(), 'active-models/countnet-model.mdl')
-                        torch.save(class_has_below_above_net.state_dict(), 'active-models/classbelowabovenet-model.mdl')
-                        torch.save(optimizer.state_dict(), 'active-models/optimizer.opt')
-
+                        if episode % 500 == 0:
+                            torch.save(lgn_net.state_dict(), 'active-models/lgn-net.mdl')
+                            torch.save(visual_cortex_net.state_dict(), 'active-models/visual-cortex-net.mdl')
+                            torch.save(class_to_pos_net.state_dict(), 'active-models/posnet-model.mdl')
+                            torch.save(pos_to_class_net.state_dict(), 'active-models/colnet-model.mdl')
+                            torch.save(uv_to_class_net.state_dict(), 'active-models/uvtoclass-model.mdl')
+                            torch.save(cae.state_dict(), 'active-models/cae-model.mdl')
+                            torch.save(count_net.state_dict(), 'active-models/countnet-model.mdl')
+                            torch.save(class_has_below_above_net.state_dict(), 'active-models/classbelowabovenet-model.mdl')
+                            torch.save(optimizer.state_dict(), 'active-models/optimizer.opt')
+                initial_action_made = True
+                frame += action_to_frame_offset(action.item())
 
     plt.plot(episodes, losses)
     plt.show()
+

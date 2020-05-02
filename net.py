@@ -47,15 +47,16 @@ class VisualCortexNet(nn.Module):
         self.batchnorm2 = nn.BatchNorm1d(2048)
 
     def forward(self, v1_out):
-        out = self.batchnorm1(v1_out)
-        out = self.fc1(out)
+        # v1_out = v1_out.reshape(1,batch_size,-1)
+        #out = self.batchnorm1(v1_out)
+        out = self.fc1(v1_out)
         out = self.lrelu(out)
         out = self.fc2(out)
         out = self.lrelu(out)
         out = self.fc3(out)
         out = self.lrelu(out)
         out = self.fc4(out)
-        out = self.batchnorm2(out)
+        # out = self.batchnorm2(out)
         return out
 
 
@@ -379,3 +380,55 @@ class ClassHasObjectBelowAboveNet(nn.Module):
 
     def loss(self, y_pred_has_below_above, y_target_has_below_above_t):
         return self.belowAbove_criterion(y_pred_has_below_above, y_target_has_below_above_t)
+
+
+# Next-Best-View Reinforcement Learning Net
+class NextBestViewRLNet(nn.Module):
+    def __init__(self, torchDevice):
+        super(NextBestViewRLNet, self).__init__()
+        self.policy_criterion = nn.CrossEntropyLoss().to(torchDevice)
+        self.value_criterion = nn.MSELoss()
+        self.lrelu = nn.LeakyReLU()
+        self.fc1_policy = nn.Linear(2048, 1024)
+        self.fc2_policy = nn.Linear(1024, 1024)
+        self.fc3_policy = nn.Linear(1024, 512)
+        self.fc4_policy = nn.Linear(512, 64)
+
+        self.fc1_value = nn.Linear(2048, 1024)
+        self.fc2_value = nn.Linear(1024, 1024)
+        self.fc3_value = nn.Linear(1024, 512)
+        self.fc4_value = nn.Linear(512, 64)
+
+        self.logits_policy = nn.Linear(64, 7)
+        self.out_value = nn.Linear(64, 1)
+
+
+    # give position, receive color
+    def forward(self, v1_in):
+        out_policy = self.fc1_policy(v1_in)
+        out_policy = self.lrelu(out_policy)
+        out_policy = self.fc2_policy(out_policy)
+        out_policy = self.lrelu(out_policy)
+        out_policy = self.fc3_policy(out_policy)
+        out_policy = self.lrelu(out_policy)
+        out_policy = self.fc4_policy(out_policy)
+        out_policy = self.lrelu(out_policy)        
+        logits_policy = self.logits_policy(out_policy)
+
+        out_value = self.fc1_policy(v1_in)
+        out_value = self.lrelu(out_value)
+        out_value = self.fc2_policy(out_value)
+        out_value = self.lrelu(out_value)
+        out_value = self.fc3_policy(out_value)
+        out_value = self.lrelu(out_value)
+        out_value = self.fc4_policy(out_value)
+        out_value = self.lrelu(out_value)        
+        out_value = self.out_value(out_value)
+
+        return logits_policy, out_value
+
+    def loss(self, pred_col_logits, pred_shape_logits, target_col_idx, target_shape_idx):
+        col_loss = self.policy_criterion(pred_col_logits, target_col_idx)
+        shape_loss = self.value_criterion(pred_shape_logits, target_shape_idx)
+        total_loss = col_loss + shape_loss
+        return total_loss
