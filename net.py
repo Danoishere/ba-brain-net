@@ -348,15 +348,15 @@ class ClassHasObjectBelowAboveNet(nn.Module):
         self.fc4 = nn.Linear(1024, 64)
         self.fc5 = nn.Linear(64, 3)
 
-        self.side_fc1 = nn.Linear(15, 64)
+        self.side_fc1 = nn.Linear(12, 64)
         self.side_fc2 = nn.Linear(64, 256)
         self.side_fc3 = nn.Linear(256, 256)
 
         self.belowAbove_criterion = nn.CrossEntropyLoss().to(torchDevice)
 
 
-    def forward(self, v1_in, below_above, col, shape):
-        side = torch.cat((below_above, col, shape), 1)
+    def forward(self, v1_in, col, shape):
+        side = torch.cat(( col, shape), 1)
         side = self.side_fc1(side)
         side = self.lrelu(side)
         side = self.side_fc2(side)

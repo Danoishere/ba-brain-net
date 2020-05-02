@@ -129,7 +129,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         obj_shape_indices = []
                         obj_shape_onehots = []
                         below_above_indices = []
-                        below_above_onehots = []
+                        #below_above_onehots = []
                         all_objs = []
                         all_cam_pos = []
                         
@@ -159,15 +159,15 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
                             if obj_has_below:
                                 below_above_idx = belowAbove.index("below")
-                                below_above_oh[below_above_idx] = 1.0
+                                #below_above_oh[below_above_idx] = 1.0
 
                             elif obj_has_above:
                                 below_above_idx = belowAbove.index("above")
-                                below_above_oh[below_above_idx] = 1.0
+                               #below_above_oh[below_above_idx] = 1.0
                             
                             else:
                                 below_above_idx = belowAbove.index("standalone")
-                                below_above_oh[below_above_idx] = 1.0
+                                #below_above_oh[below_above_idx] = 1.0
 
 
                             obj_col_oh = np.zeros(len(colors))
@@ -179,7 +179,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                             y_target_rel_pos.append(obj_rel_pos)
                             obj_col_onehots.append(obj_col_oh)
                             obj_shape_onehots.append(obj_shape_oh)
-                            below_above_onehots.append(below_above_oh)
+                            #below_above_onehots.append(below_above_oh)
                             obj_col_indices.append(obj_col_idx)
                             obj_shape_indices.append(obj_shape_idx)
                             below_above_indices.append(below_above_idx)
@@ -205,7 +205,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         y_col_idx = torch.tensor(obj_col_indices, dtype=torch.long).to(torchDevice)
                         y_shape_idx = torch.tensor(obj_shape_indices, dtype=torch.long).to(torchDevice)
                         y_uvs = torch.tensor(all_uvs, requires_grad=True, dtype=torch.float32).to(torchDevice)
-                        y_has_below_above_oh = torch.tensor(below_above_onehots, requires_grad=True, dtype=torch.float32).to(torchDevice)
+                        #y_has_below_above_oh = torch.tensor(below_above_onehots, requires_grad=True, dtype=torch.float32).to(torchDevice)
                         y_has_below_above_idx = torch.tensor(below_above_indices, dtype=torch.long).to(torchDevice)
 
 
@@ -222,7 +222,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         tot_loss_uv_to_class += [uv_to_class_net.loss(y_pred_col,y_pred_shape, y_col_idx, y_shape_idx)]
 
                         # Find hasAbove loss
-                        y_pred_has_below_above = class_has_below_above_net(v1_out, y_has_below_above_oh, y_col_oh, y_shape_oh)
+                        y_pred_has_below_above = class_has_below_above_net(v1_out, y_col_oh, y_shape_oh)
                         tot_loss_class_has_below_above += [class_has_below_above_net.loss(y_pred_has_below_above,y_has_below_above_idx)]
 
                     p_dones, p_cols, p_shapes, p_pos = count_net(v1_out)
