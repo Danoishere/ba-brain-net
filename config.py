@@ -21,3 +21,14 @@ training_path = 'C:/Users/Dano/Documents/ZHAW/bachelor-thesis/training-data-no-o
 #training_path = '/Users/ralph/Documents/Blender/training-data-relative-pos-no-obstacle/'
 #training_path = '/cluster/home/meierr18/BA_2020/training_scenes/'
 temp_path = './.temp/'
+
+BUFFER_SIZE = int(1e5)  #replay buffer size
+BATCH_SIZE = 64         # minibatch size
+GAMMA = 0.99            # discount factor
+TAU = 1e-3              # for soft update of target parameters
+LR = 5e-4               # learning rate
+UPDATE_EVERY = 4        # how often to update the network
+
+eps_start=1.0
+eps_end = 0.01
+eps_decay=0.996

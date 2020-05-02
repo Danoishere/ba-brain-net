@@ -432,3 +432,28 @@ class NextBestViewRLNet(nn.Module):
         shape_loss = self.value_criterion(pred_shape_logits, target_shape_idx)
         total_loss = col_loss + shape_loss
         return total_loss
+
+class QNetwork(nn.Module):
+    def __init__(self, torchDevice):
+        super(QNetwork, self).__init__()
+        self.lrelu = nn.LeakyReLU()
+
+        self.fc1 = nn.Linear(2048, 1024)
+        self.fc2 = nn.Linear(1024, 1024)
+        self.fc3 = nn.Linear(1024, 512)
+        self.fc4 = nn.Linear(512, 64)
+
+        self.out_actions = nn.Linear(64, 7)
+
+
+    # give position, receive color
+    def forward(self, v1_in):
+        out = self.fc1(v1_in)
+        out = self.lrelu(out)
+        out = self.fc2(out)
+        out = self.lrelu(out)
+        out = self.fc3(out)
+        out = self.lrelu(out)
+        out = self.fc4(out)
+        out = self.lrelu(out)        
+        return self.out_actions(out)
