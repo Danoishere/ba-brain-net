@@ -99,7 +99,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
             for frame in range(start_frame, start_frame + clip_length):
                 clip_frame += 1
                 current_frame = frame % sequence_length # int(frame*skip + offset)
-                print(current_frame)
+                # print(current_frame)
                 frame_input = torch.tensor(batch_x[current_frame], requires_grad=True).float().to(torchDevice)
                 encoded = cae.encode(frame_input)
                 output = encoded.reshape(batch_size, -1)
@@ -177,20 +177,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                             obj_shape_indices.append(obj_shape_idx)
                             below_above_indices.append(below_above_idx)
 
-
-                            """
-                            print(obj_rel_pos)
-                            print(rnd_obj)
-                            print(obj_col_oh)
-                            print(obj_shape_oh)
-                            img = np.moveaxis(batch_x[last_frame, scenes.index(scene), :3, :, :], 0,2)
-                            plt.imshow(img)
-                            plt.show()
-                            """
-                            
-                            
-
-
                         # oh = one-hot
                         y_col_oh = torch.tensor(obj_col_onehots, requires_grad=True, dtype=torch.float32).to(torchDevice)
                         y_shape_oh = torch.tensor(obj_shape_onehots, requires_grad=True, dtype=torch.float32).to(torchDevice)
@@ -217,6 +203,16 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         y_pred_has_below_above = class_has_below_above_net(v1_out, y_col_oh, y_shape_oh)
                         tot_loss_class_has_below_above += [class_has_below_above_net.loss(y_pred_has_below_above,y_has_below_above_idx)]
 
+                    """
+                    print(obj_rel_pos)
+                    print(rnd_obj)
+                    print(obj_col_oh)
+                    print(obj_shape_oh)
+                    img = np.moveaxis(batch_x[last_frame, scenes.index(scene), :3, :, :], 0,2)
+                    plt.imshow(img)
+                    plt.show()
+                    """
+
                     p_dones, p_cols, p_shapes, p_pos = count_net(v1_out)
                     tot_loss_countnet = count_net.loss(p_dones, p_cols, p_shapes, p_pos, scenes, last_frame)
 
@@ -232,7 +228,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     tot_loss_class_has_below_above = torch.stack(tot_loss_class_has_below_above)
                     tot_loss_class_has_below_above = torch.mean(tot_loss_class_has_below_above)
 
-                    print('Episode', episode, ', Loss Pos.:', tot_loss_class_to_pos.item())
+                    print('Episode', episode,', Clip Frame',clip_frame, ', Loss Pos.:', tot_loss_class_to_pos.item())
 
                     tot_loss_sum = tot_loss_class_to_pos + tot_loss_pos_to_class + tot_loss_uv_to_class + tot_loss_countnet + tot_loss_class_has_below_above
                     tot_loss_sum.backward(retain_graph=True)
@@ -240,7 +236,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     optimizer.step()
                     
                     episodes.append(episode)
-                    #losses.append(loss.item()/num_l_has_mores)
                     writer.add_scalar("Loss/Class-to-Position-Loss", tot_loss_class_to_pos.item(), episode)
                     writer.add_scalar("Loss/Position-to-Class-Loss", tot_loss_pos_to_class.item(), episode)
                     writer.add_scalar("Loss/UV-to-Class-Loss", tot_loss_uv_to_class.item(), episode)
