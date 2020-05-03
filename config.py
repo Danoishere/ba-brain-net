@@ -1,9 +1,9 @@
 
-lr=0.000005 #local
-#lr=0.00001
+#lr=0.000005 #local
+lr=0.00001
 
-batch_size = 16 #local
-#batch_size = 64
+#batch_size = 16 #local
+batch_size = 64
 sequence_length = 36
 w,h = 128, 128
 
@@ -16,6 +16,7 @@ belowAbove = ["standalone", "below", "above"]
 
 #training_path = 'D:/training-data-relative-pos-no-obstacle/'
 #training_path = 'C:/Users/Dano/Documents/ZHAW/bachelor-thesis/training-data-no-obstacle/'
-training_path = '/Users/ralph/Documents/Blender/training-data-relative-pos-no-obstacle/'
+#training_path = '/Users/ralph/Documents/Blender/training-data-relative-pos-no-obstacle/'
 #training_path = '/cluster/home/meierr18/BA_2020/training_scenes/'
+training_path = '/cluster/home/meierr18/BA_2020/training_scenes_obstacles/'
 temp_path = './.temp/'

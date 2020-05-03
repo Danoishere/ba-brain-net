@@ -60,7 +60,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     count_net.train()
 
     class_has_below_above_net = net.ClassHasObjectBelowAboveNet(torchDevice).to(torchDevice)
-    #class_has_below_above_net.load_state_dict(torch.load('active-models/classbelowabovenet-model.mdl', map_location=torchDevice))
+    class_has_below_above_net.load_state_dict(torch.load('active-models/classbelowabovenet-model.mdl', map_location=torchDevice))
     class_has_below_above_net.train()
 
     params = []
@@ -90,7 +90,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
         for repetition in range(3):
             start_frame = randint(0, sequence_length - 1)
-            clip_length = randint(4, 8) + 1
+            clip_length = randint(16, 24) + 1
             
             optimizer.zero_grad()
             lgn_net.init_hidden(torchDevice)
@@ -106,7 +106,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                 output = lgn_net(output)
                 last_frame = current_frame
 
-                if clip_frame > 4:
+                if clip_frame > 12:
 
                     v1_out = visual_cortex_net(output)
 
@@ -153,8 +153,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
                             obj_has_above = 'is_below' in scene_objects[rnd_obj].keys() #is below -> has above
                             obj_has_below = 'is_above' in scene_objects[rnd_obj].keys() #is above -> has below
-
-                            below_above_oh = np.zeros(len(belowAbove))
 
                             if obj_has_below:
                                 below_above_idx = belowAbove.index("below")
@@ -247,7 +245,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     writer.add_scalar("Loss/Position-to-Class-Loss", tot_loss_pos_to_class.item(), episode)
                     writer.add_scalar("Loss/UV-to-Class-Loss", tot_loss_uv_to_class.item(), episode)
                     writer.add_scalar("Loss/Obj-Count-Loss", tot_loss_countnet.item(), episode)
-                    writer.add_scalar("Loss/Class-has-Above-Loss", tot_loss_class_has_below_above.item(), episode)
+                    writer.add_scalar("Loss/Class-has-Below-Above-Loss", tot_loss_class_has_below_above.item(), episode)
                     episode += 1
 
                     if episode % 500 == 0:
