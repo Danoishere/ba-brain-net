@@ -435,3 +435,30 @@ class ClassHasObjectBelowAboveNet(nn.Module):
 
     def loss(self, y_pred_has_below_above, y_target_has_below_above_t):
         return self.belowAbove_criterion(y_pred_has_below_above, y_target_has_below_above_t)
+
+
+class LossApproximationNet(nn.Module):
+    def __init__(self, torchDevice):
+        super(LossApproximationNet, self).__init__()
+        self.lrelu = nn.LeakyReLU()
+        self.fc1 = nn.Linear(2048, 2048)
+        self.fc2 = nn.Linear(2048, 1024)
+        self.fc3 = nn.Linear(1024, 64)
+        self.fc4 = nn.Linear(64, 1)
+
+        self.norm_loss_criterion = nn.MSELoss().to(torchDevice)
+
+
+    def forward(self, v1_in):
+        out = self.fc1(v1_in)
+        out = self.lrelu(out)
+        out = self.fc2(out)
+        out = self.lrelu(out)
+        out = self.fc3(out)
+        out = self.lrelu(out)
+        out = self.fc4(out)
+        return out
+
+
+    def loss(self, y_pred_norm_loss, y_target_norm_loss):
+        return self.norm_loss_criterion(y_pred_norm_loss, y_target_norm_loss)
