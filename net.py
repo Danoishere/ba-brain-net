@@ -462,3 +462,31 @@ class LossApproximationNet(nn.Module):
 
     def loss(self, y_pred_norm_loss, y_target_norm_loss):
         return self.norm_loss_criterion(y_pred_norm_loss, y_target_norm_loss)
+
+
+class QNet(nn.Module):
+    def __init__(self, torchDevice):
+        super(QNet, self).__init__()
+        self.lrelu = nn.LeakyReLU()
+        self.fc1 = nn.Linear(2048, 2048)
+        self.fc2 = nn.Linear(2048, 1024)
+        self.fc3 = nn.Linear(1024, 64)
+        self.fc4 = nn.Linear(64, 7)
+
+        self.reward_criterion = nn.MSELoss().to(torchDevice)
+
+
+    def forward(self, v1_in):
+        out = self.fc1(v1_in)
+        out = self.lrelu(out)
+        out = self.fc2(out)
+        out = self.lrelu(out)
+        out = self.fc3(out)
+        out = self.lrelu(out)
+        out = self.fc4(out)
+        return out
+
+
+    def loss(self, selected_action, y_pred_reward, y_target_reward):
+        y_target_reward = y_target_reward.repeat(2).float()
+        return self.reward_criterion(y_pred_reward[:, selected_action], y_target_reward)
