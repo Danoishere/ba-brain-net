@@ -68,7 +68,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     loss_aprox_net.train()
 
     q_net = net.QNet(torchDevice).to(torchDevice)
-    q_net.load_state_dict(torch.load('active-models/q-net-model.mdl', map_location=torchDevice))
+    #q_net.load_state_dict(torch.load('active-models/q-net-model.mdl', map_location=torchDevice))
     q_net.train()
 
     params = []
