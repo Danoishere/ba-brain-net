@@ -64,7 +64,7 @@ def load_batch():
         extract_zip(file, temp_path)
 
         rgb_frames, depth_frames, scene_data = load_scene_data(scene_id)
-        is_reversed = np.random.random() < 0.5
+        is_reversed = False # np.random.random() < 0.5
 
         frame_input = np.zeros((4,w,h))
         for frame in range(sequence_length):

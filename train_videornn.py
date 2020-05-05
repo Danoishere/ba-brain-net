@@ -121,7 +121,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                 output = encoded.reshape(batch_size, -1)
                 output = lgn_net(output)
                 last_frame = current_frame
-
+                
                 if clip_frame > 12:
                     v1_out = visual_cortex_net(output)
 
@@ -174,10 +174,8 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
                             elif obj_has_above:
                                 below_above_idx = belowAbove.index("above")
-                            
                             else:
                                 below_above_idx = belowAbove.index("standalone")
-
 
                             obj_col_oh = np.zeros(len(colors))
                             obj_col_oh[obj_col_idx] = 1.0
@@ -232,32 +230,41 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     tot_loss_countnet = count_net.loss(p_dones, p_cols, p_shapes, p_pos, scenes, last_frame)
 
                     tot_loss_class_to_pos = torch.stack(tot_loss_class_to_pos)
-                    tot_loss_class_to_pos = torch.mean(tot_loss_class_to_pos)
+                    tot_loss_class_to_pos = torch.mean(tot_loss_class_to_pos,dim=0)
 
                     tot_loss_pos_to_class = torch.stack(tot_loss_pos_to_class)
-                    tot_loss_pos_to_class = torch.mean(tot_loss_pos_to_class)
+                    tot_loss_pos_to_class = torch.mean(tot_loss_pos_to_class,dim=0)
 
                     tot_loss_uv_to_class = torch.stack(tot_loss_uv_to_class)
-                    tot_loss_uv_to_class = torch.mean(tot_loss_uv_to_class)
+                    tot_loss_uv_to_class = torch.mean(tot_loss_uv_to_class,dim=0)
 
                     tot_loss_class_has_below_above = torch.stack(tot_loss_class_has_below_above)
-                    tot_loss_class_has_below_above = torch.mean(tot_loss_class_has_below_above)
+                    tot_loss_class_has_below_above = torch.mean(tot_loss_class_has_below_above,dim=0)
 
-                    print('Episode', episode,', Clip Frame',clip_frame, ', Loss Pos.:', tot_loss_class_to_pos.item())
+                    print('Episode', episode,', Clip Frame',clip_frame,'Action', action, ', Loss Pos.:', torch.mean(tot_loss_class_to_pos).item())
 
                     tot_loss_sum = tot_loss_class_to_pos + tot_loss_pos_to_class + tot_loss_uv_to_class + tot_loss_countnet + tot_loss_class_has_below_above
 
-                    
+                    # note to dano: 
+                    # Problem: One loss for batch! That doesnt work (it's the fcking average). Use per-batch sums
+                    # Also: Long term reward
+
+
                     #pred_norm_loss = loss_aprox_net(v1_out)
                     #tot_loss_loss_aprox = loss_aprox_net.loss(pred_norm_loss, norm_tot_loss)
                     #tot_loss_sum += tot_loss_loss_aprox
 
                     if last_v1_out is not None:
-                        current_reward = -torch.tanh(0.05 * tot_loss_sum.clone().detach())
+                        current_reward = -tot_loss_sum.clone().detach().float()
+                        #current_reward = torch.tensor(current_reward).float().to(torchDevice)
                         q_values = q_net(last_v1_out)
-                        q_loss = q_net.loss(action, q_values, current_reward)
-                        tot_loss_sum += q_loss
+                        print(q_values)
+                        q_loss = q_net.loss(config.actions.index(action), q_values, current_reward)
+                        tot_loss_sum += q_loss*0.1
 
+                        writer.add_scalar("Loss/Q-Net-Loss", torch.mean(q_loss).item(), episode)
+
+                    tot_loss_sum = torch.mean(tot_loss_sum)
                     tot_loss_sum.backward(retain_graph=True)
                     #nn.utils.clip_grad_norm_(params, 0.025)
                     optimizer.step()
@@ -265,11 +272,12 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     last_v1_out = v1_out
 
                     episodes.append(episode)
-                    writer.add_scalar("Loss/Class-to-Position-Loss", tot_loss_class_to_pos.item(), episode)
-                    writer.add_scalar("Loss/Position-to-Class-Loss", tot_loss_pos_to_class.item(), episode)
-                    writer.add_scalar("Loss/UV-to-Class-Loss", tot_loss_uv_to_class.item(), episode)
-                    writer.add_scalar("Loss/Obj-Count-Loss", tot_loss_countnet.item(), episode)
-                    writer.add_scalar("Loss/Class-has-Below-Above-Loss", tot_loss_class_has_below_above.item(), episode)
+                    writer.add_scalar("Loss/Class-to-Position-Loss", torch.mean(tot_loss_class_to_pos).item(), episode)
+                    writer.add_scalar("Loss/Position-to-Class-Loss", torch.mean(tot_loss_pos_to_class).item(), episode)
+                    writer.add_scalar("Loss/UV-to-Class-Loss", torch.mean(tot_loss_uv_to_class).item(), episode)
+                    writer.add_scalar("Loss/Obj-Count-Loss", torch.mean(tot_loss_countnet).item(), episode)
+                    writer.add_scalar("Loss/Class-has-Below-Above-Loss", torch.mean(tot_loss_class_has_below_above).item(), episode)
+                   
                     #writer.add_scalar("Loss/Loss-Approximation-Loss", tot_loss_loss_aprox.item(), episode)
                     episode += 1
 
@@ -283,6 +291,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         torch.save(count_net.state_dict(), 'active-models/countnet-model.mdl')
                         torch.save(class_has_below_above_net.state_dict(), 'active-models/classbelowabovenet-model.mdl')
                         torch.save(loss_aprox_net.state_dict(), 'active-models/loss-aprox-net-model.mdl')
+                        torch.save(q_net.state_dict(), 'active-models/q-net-model.mdl')
                         torch.save(optimizer.state_dict(), 'active-models/optimizer.opt')
 
                 last_action = action

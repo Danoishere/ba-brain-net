@@ -110,15 +110,15 @@ class ClassToPosNet(nn.Module):
         # sqrt(x^2 + y^2 + z^2)
         diff = torch.sum((y_pred_pos - y_target_pos_t)**2, dim=1)
         diff_sum_sqrt = torch.sqrt(diff)
-        loss_pos = torch.mean(diff_sum_sqrt)
-        return loss_pos
+        #loss_pos = torch.mean(diff_sum_sqrt)
+        return diff_sum_sqrt
 
 # (vent_in, dors_in, pos) -> (col, shape)
 class PosToClass(nn.Module):
     def __init__(self, torchDevice):
         super(PosToClass, self).__init__()
-        self.col_criterion = nn.CrossEntropyLoss().to(torchDevice)
-        self.shape_criterion = nn.CrossEntropyLoss().to(torchDevice)
+        self.col_criterion = nn.CrossEntropyLoss(reduction='none').to(torchDevice)
+        self.shape_criterion = nn.CrossEntropyLoss(reduction='none').to(torchDevice)
         self.lrelu = nn.LeakyReLU()
         self.fc1 = nn.Linear(2048 + 3, 1024)
         self.fc2 = nn.Linear(1024, 1024)
@@ -160,8 +160,8 @@ class PosToClass(nn.Module):
 class UVToClass(nn.Module):
     def __init__(self, torchDevice):
         super(UVToClass, self).__init__()
-        self.col_criterion = nn.CrossEntropyLoss().to(torchDevice)
-        self.shape_criterion = nn.CrossEntropyLoss().to(torchDevice)
+        self.col_criterion = nn.CrossEntropyLoss(reduction='none').to(torchDevice)
+        self.shape_criterion = nn.CrossEntropyLoss(reduction='none').to(torchDevice)
         self.lrelu = nn.LeakyReLU()
         self.fc1 = nn.Linear(2048 + 2, 1024)
         self.fc2 = nn.Linear(1024, 1024)
@@ -207,9 +207,9 @@ class UVToClass(nn.Module):
 class ObjCountNet(nn.Module):
     def __init__(self, torchDevice):
         super(ObjCountNet, self).__init__()
-        self.col_criterion = nn.CrossEntropyLoss().to(torchDevice)
-        self.shape_criterion = nn.CrossEntropyLoss().to(torchDevice)
-        self.done_criterion = nn.BCEWithLogitsLoss().to(torchDevice)
+        self.col_criterion = nn.CrossEntropyLoss(reduction='none').to(torchDevice)
+        self.shape_criterion = nn.CrossEntropyLoss(reduction='none').to(torchDevice)
+        self.done_criterion = nn.BCEWithLogitsLoss(reduction='none').to(torchDevice)
 
         self.lrelu = nn.LeakyReLU()
         self.n_layers = 1
@@ -339,15 +339,16 @@ class ObjCountNet(nn.Module):
                 objs.append((obj, scene['objects'][obj]))
             scene_objects.append(objs)
 
-        loss_pos = [] #torch.tensor(0.0).to(self.torchDevice)
-        loss_col = []
-        loss_shape = []
-        # 1 = found more, 0 = all objects outputted
-        loss_has_more = []
+        
 
         pred_pos = torch.stack(l_pos)
-
+        loss_batch = []
         for s in range(len(scenes)):
+            loss_pos = [] #torch.tensor(0.0).to(self.torchDevice)
+            loss_col = []
+            loss_shape = []
+            # 1 = found more, 0 = all objects outputted
+            loss_has_more = []
             # Calculate transformation matrix for relative positions
             scene_cam_mat = np.array(scene["cam_base_matricies"][last_frame])
             scene_cam_mat = np.linalg.inv(scene_cam_mat)
@@ -386,12 +387,14 @@ class ObjCountNet(nn.Module):
                 obj_has_more = torch.tensor([0.0], dtype=torch.float).to(self.torchDevice)
                 loss_has_more += [self.done_criterion(l_has_more[i][s], obj_has_more)]
 
-        loss_pos = torch.mean(torch.stack(loss_pos))
-        loss_col = torch.mean(torch.stack(loss_col))
-        loss_shape = torch.mean(torch.stack(loss_shape))
-        loss_has_more = torch.mean(torch.stack(loss_has_more))
+            loss_pos = torch.mean(torch.stack(loss_pos))
+            loss_col =  torch.mean(torch.stack(loss_col))
+            loss_shape =  torch.mean(torch.stack(loss_shape))
+            loss_has_more =  torch.mean(torch.stack(loss_has_more))
+
+            loss_batch.append(loss_pos + loss_col + loss_shape + loss_has_more)
                 
-        return loss_pos + loss_col + loss_shape + loss_has_more
+        return torch.stack(loss_batch)
 
 # (vent_in, dors_in, shape, col) -> hasAboveNet
 class ClassHasObjectBelowAboveNet(nn.Module):
@@ -408,7 +411,7 @@ class ClassHasObjectBelowAboveNet(nn.Module):
         self.side_fc2 = nn.Linear(64, 256)
         self.side_fc3 = nn.Linear(256, 256)
 
-        self.belowAbove_criterion = nn.CrossEntropyLoss().to(torchDevice)
+        self.belowAbove_criterion = nn.CrossEntropyLoss(reduction='none').to(torchDevice)
 
 
     def forward(self, v1_in, col, shape):
@@ -446,7 +449,7 @@ class LossApproximationNet(nn.Module):
         self.fc3 = nn.Linear(1024, 64)
         self.fc4 = nn.Linear(64, 1)
 
-        self.norm_loss_criterion = nn.MSELoss().to(torchDevice)
+        self.norm_loss_criterion = nn.MSELoss(reduction='none').to(torchDevice)
 
 
     def forward(self, v1_in):
@@ -473,7 +476,7 @@ class QNet(nn.Module):
         self.fc3 = nn.Linear(1024, 64)
         self.fc4 = nn.Linear(64, 7)
 
-        self.reward_criterion = nn.MSELoss().to(torchDevice)
+        self.reward_criterion = nn.MSELoss(reduction='none').to(torchDevice)
 
 
     def forward(self, v1_in):
@@ -488,5 +491,4 @@ class QNet(nn.Module):
 
 
     def loss(self, selected_action, y_pred_reward, y_target_reward):
-        y_target_reward = y_target_reward.repeat(2).float()
         return self.reward_criterion(y_pred_reward[:, selected_action], y_target_reward)
