@@ -312,7 +312,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     future_mem = memory[i]
                     reward += 0.8**r * future_mem[2]
 
-                reward *= 0.2
                 q_loss = q_net.loss(config.actions.index(action), q_values, reward)
                 rl_loss += q_loss*0.1
 
