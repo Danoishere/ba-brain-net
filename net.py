@@ -354,25 +354,22 @@ class ObjCountNet(nn.Module):
 
             scene = scenes[s]
             scene_objs = scene_objects[s]
-            scene_pos = []
             for scene_obj in scene_objs:
                 scene_obj_pos = scene_cam_mat @ np.array(scene_obj[1]['pos'] + [1.0])
-                scene_pos.append(scene_obj_pos[:3])
-            scene_pos = np.asarray(scene_pos)
+                scene_obj[1]['rel_pos'] = scene_obj_pos[:3]
 
-            pred_scene_pos_t = pred_pos[:len(scene_pos), s, :]
-            pred_scene_pos_n = pred_scene_pos_t.clone().cpu().detach().numpy()
+            num_objs = len(scene_objs)
+            for i in range(num_objs):
+                pred_obj_pos = pred_pos[i,s,:].detach().numpy()
+                closest_dist = 100
+                closest_obj = None
+                for scene_obj in scene_objs:
+                    dist = np.linalg.norm(scene_obj[1]['rel_pos'] - pred_obj_pos)
+                    if dist < closest_dist:
+                        closest_dist = dist
+                        closest_obj = scene_obj
 
-            cost_matrix = cdist(pred_scene_pos_n, scene_pos)
-            _, assignment = linear_sum_assignment(cost_matrix)
-
-            # REMEMBER: Use updated relative position!!!!!!!
-
-            for i in range(len(scene_objs)):
-                closest_obj = scene_objs[assignment[i]]
-                closest_pos = scene_pos[assignment[i]]
-
-                obj_pos = torch.tensor(closest_pos).to(self.torchDevice)
+                obj_pos = torch.tensor(closest_obj[1]['rel_pos']).to(self.torchDevice)
                 obj_col_idx = torch.tensor([config.colors.index(closest_obj[1]['color-name'])], dtype=torch.long).to(self.torchDevice)
                 obj_shape_idx = torch.tensor([config.shapes.index(closest_obj[0].split('-')[0])], dtype=torch.long).to(self.torchDevice)
                 obj_has_more = torch.tensor([1.0], dtype=torch.float).to(self.torchDevice)
@@ -382,7 +379,7 @@ class ObjCountNet(nn.Module):
                 loss_shape += [self.shape_criterion(l_shape[i][s].unsqueeze(0), obj_shape_idx)]
                 loss_has_more += [self.done_criterion(l_has_more[i][s], obj_has_more)]
       
-            for i in range(len(scene_objs), len(l_has_more)):
+            for i in range(num_objs, len(l_has_more)):
                 obj_has_more = torch.tensor([0.0], dtype=torch.float).to(self.torchDevice)
                 loss_has_more += [self.done_criterion(l_has_more[i][s], obj_has_more)]
 

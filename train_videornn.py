@@ -63,10 +63,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     #class_has_below_above_net.load_state_dict(torch.load('active-models/classbelowabovenet-model.mdl', map_location=torchDevice))
     class_has_below_above_net.train()
 
-    loss_aprox_net = net.LossApproximationNet(torchDevice).to(torchDevice)
-    #loss_pred_net.load_state_dict(torch.load('active-models/loss-aprox-net-model.mdl', map_location=torchDevice))
-    loss_aprox_net.train()
-
     params = []
     params += list(cae.parameters())
     params += list(lgn_net.parameters())
@@ -76,7 +72,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     params += list(uv_to_class_net.parameters())
     params += list(count_net.parameters())
     params += list(class_has_below_above_net.parameters())
-    params += list(loss_aprox_net.parameters())
 
     optimizer = torch.optim.Adam(params, lr=lr)
     #optimizer.load_state_dict(torch.load('active-models/optimizer.opt'))
@@ -236,12 +231,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     print('Episode', episode,', Clip Frame',clip_frame, ', Loss Pos.:', tot_loss_class_to_pos.item())
 
                     tot_loss_sum = tot_loss_class_to_pos + tot_loss_pos_to_class + tot_loss_uv_to_class + tot_loss_countnet + tot_loss_class_has_below_above
-
-                    norm_tot_loss = torch.tanh(0.05 * tot_loss_sum.clone().detach())
-                    pred_norm_loss = loss_aprox_net(v1_out)
-                    tot_loss_loss_aprox = loss_aprox_net.loss(pred_norm_loss, norm_tot_loss)
-                    tot_loss_sum += tot_loss_loss_aprox
-
                     tot_loss_sum.backward(retain_graph=True)
                     #nn.utils.clip_grad_norm_(params, 0.025)
                     optimizer.step()
@@ -252,7 +241,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     writer.add_scalar("Loss/UV-to-Class-Loss", tot_loss_uv_to_class.item(), episode)
                     writer.add_scalar("Loss/Obj-Count-Loss", tot_loss_countnet.item(), episode)
                     writer.add_scalar("Loss/Class-has-Below-Above-Loss", tot_loss_class_has_below_above.item(), episode)
-                    writer.add_scalar("Loss/Loss-Approximation-Loss", tot_loss_loss_aprox.item(), episode)
                     episode += 1
 
                     if episode % 500 == 0:
@@ -264,7 +252,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         torch.save(cae.state_dict(), 'active-models/cae-model.mdl')
                         torch.save(count_net.state_dict(), 'active-models/countnet-model.mdl')
                         torch.save(class_has_below_above_net.state_dict(), 'active-models/classbelowabovenet-model.mdl')
-                        torch.save(loss_aprox_net.state_dict(), 'active-models/loss-aprox-net-model.mdl')
                         torch.save(optimizer.state_dict(), 'active-models/optimizer.opt')
 
 
