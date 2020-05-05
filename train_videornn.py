@@ -257,19 +257,26 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     #tot_loss_loss_aprox = loss_aprox_net.loss(pred_norm_loss, norm_tot_loss)
                     #tot_loss_sum += tot_loss_loss_aprox
 
+                    loss = torch.tensor(0.0, dtype=torch.float32).to(torchDevice)
                     if last_v1_out is not None:
                         current_loss = tot_loss_sum.clone().detach().float()
                         reward = (last_loss - current_loss).detach()
-                        memory.append((last_v1_out, last_action, reward))
+                        q_values = q_net(last_v1_out)
+                        q_loss = q_net.loss(config.actions.index(last_action), q_values, reward)
+                        loss += q_loss
+
+                        writer.add_scalar("Loss/Q-Net-Loss", torch.mean(q_loss).item(), episode)
+                        #memory.append((last_v1_out, last_action, reward))
 
                         #current_reward = torch.tensor(current_reward).float().to(torchDevice)
                         
-
                     last_loss = tot_loss_sum.clone().detach().float()
                     last_v1_out = v1_out
 
                     tot_loss_sum = torch.mean(tot_loss_sum)
-                    tot_loss_sum.backward(retain_graph=True)
+                    
+                    loss += tot_loss_sum
+                    loss.backward(retain_graph=True)
                     #nn.utils.clip_grad_norm_(params, 0.025)
                     optimizer.step()
                     
@@ -299,6 +306,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
                 last_action = action
 
+            """
             rl_loss = torch.tensor(0.0, dtype=torch.float32).to(torchDevice)
             for i in range(len(memory)):
                 mem = memory[i]
@@ -317,6 +325,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
                 writer.add_scalar("Loss/Q-Net-Loss", torch.mean(q_loss).item(), episode - len(memory) + i + 1)
             rl_loss.backward()
+            """
 
     plt.plot(episodes, losses)
     plt.show()
