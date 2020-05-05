@@ -476,7 +476,7 @@ class QNet(nn.Module):
         self.fc3 = nn.Linear(1024, 64)
         self.fc4 = nn.Linear(64, 7)
 
-        self.reward_criterion = nn.MSELoss(reduction='none').to(torchDevice)
+        self.reward_criterion = nn.MSELoss().to(torchDevice)
 
 
     def forward(self, v1_in):
