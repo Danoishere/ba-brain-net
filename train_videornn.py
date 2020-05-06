@@ -96,7 +96,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
     eps = 1.0
     eps_min = 0.01
-    eps_decay = 0.999
+    eps_decay = 0.9999
     
     while True:
         last_frame = 0
@@ -104,7 +104,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
         # Pass batch frame by frame
 
         for repetition in range(3):
-            frame = randint(0, sequence_length - 1)
             frame = np.random.randint(0, sequence_length, batch_size)
 
             clip_length = randint(16, 24)
