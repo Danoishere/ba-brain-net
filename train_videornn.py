@@ -95,9 +95,12 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     episodes = []
 
     episode = 0
+    rl_episode = 0
     num_queries = config.num_queries
     skip = config.skip_factor
 
+    eps = 0.5
+    eps_decay = 0.995
     
     while True:
         last_frame = 0
@@ -108,7 +111,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
             frame = randint(0, sequence_length - 1)
             frame = np.random.randint(0, sequence_length, batch_size)
 
-            clip_length = 15 # randint(16, 24) + 1
+            clip_length = randint(16, 24)
             optimizer.zero_grad()
             lgn_net.init_hidden(torchDevice)
             
@@ -116,8 +119,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
             last_v1_out = None
             clip_frame = 0
             action_idx = np.ones(batch_size, dtype=np.int)*3
-            eps = 0.5
-            eps_decay = 0.995
+            
             memory = []
             
             for step in range(clip_length):
@@ -296,6 +298,8 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         torch.save(q_net.state_dict(), 'active-models/q-net-model.mdl')
                         torch.save(optimizer.state_dict(), 'active-models/optimizer.opt')
 
+                    episode += 1
+
                 last_action_idx = action_idx
                 q_net_out = q_net(output)
                 action_idx = torch.argmax(q_net_out,dim=1).cpu().numpy()
@@ -306,7 +310,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     if eps > np.random.random():
                         action_idx[scene_idx] = randint(0, len(config.actions) - 1)
                 
-                eps *= eps_decay
+            eps *= eps_decay
 
             rl_loss = [] #torch.tensor(0.0, dtype=torch.float32).to(torchDevice)
             for i in range(len(memory)):
@@ -325,10 +329,11 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                 rl_loss += [q_loss]
 
             rl_loss = torch.mean(torch.stack(rl_loss))
-            writer.add_scalar("Loss/Q-Net-Loss", torch.mean(rl_loss).item(), episode)
+            writer.add_scalar("Loss/Q-Net-Loss", torch.mean(rl_loss).item(), rl_episode)
+            rl_episode += 1
             rl_loss.backward()
 
-            episode += 1
+            
             
 
     plt.plot(episodes, losses)
