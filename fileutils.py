@@ -50,7 +50,7 @@ def reshape_frame(rgb, depth):
 
 
 def load_batch():
-    batch_x = np.zeros((sequence_length, batch_size, 4, h, w))
+    batch_x = np.zeros((sequence_length, batch_size, 4, h, w), dtype=np.float32)
     batch_idx = 0
 
     zip_files = list(glob.glob(training_path + "*.zip"))
