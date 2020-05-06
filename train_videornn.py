@@ -199,7 +199,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                             obj_shape_indices.append(obj_shape_idx)
                             below_above_indices.append(below_above_idx)
 
-                            scene_idx
+                            scene_idx += 1
 
                         # oh = one-hot
                         y_col_oh = torch.tensor(obj_col_onehots, requires_grad=True, dtype=torch.float32).to(torchDevice)
