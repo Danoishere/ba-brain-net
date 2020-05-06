@@ -360,7 +360,7 @@ class ObjCountNet(nn.Module):
 
             num_objs = len(scene_objs)
             for i in range(num_objs):
-                pred_obj_pos = pred_pos[i,s,:].detach().numpy()
+                pred_obj_pos = pred_pos[i,s,:].detach().cpu().numpy()
                 closest_dist = 100
                 closest_obj = None
                 for scene_obj in scene_objs:
