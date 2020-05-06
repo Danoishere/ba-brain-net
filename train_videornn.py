@@ -108,7 +108,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
             frame = randint(0, sequence_length - 1)
             frame = np.random.randint(0, sequence_length, batch_size)
 
-            clip_length = 14 # randint(16, 24) + 1
+            clip_length = randint(16, 24) + 1
             optimizer.zero_grad()
             lgn_net.init_hidden(torchDevice)
             
