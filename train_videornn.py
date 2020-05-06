@@ -95,6 +95,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     skip = config.skip_factor
 
     eps = 1.0
+    eps_min = 0.01
     eps_decay = 0.999
     
     while True:
@@ -304,6 +305,8 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         action_idx[scene_idx] = randint(0, len(config.actions) - 1)
                 
             eps *= eps_decay
+            eps = max([eps_min, eps])
+
 
             rl_loss = [] #torch.tensor(0.0, dtype=torch.float32).to(torchDevice)
             for i in range(len(memory)):
