@@ -108,7 +108,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
             frame = randint(0, sequence_length - 1)
             frame = np.random.randint(0, sequence_length, batch_size)
 
-            clip_length = randint(16, 24) + 1
+            clip_length = 15 # randint(16, 24) + 1
             optimizer.zero_grad()
             lgn_net.init_hidden(torchDevice)
             
@@ -136,6 +136,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                 output = encoded.reshape(batch_size, -1)
                 output = lgn_net(output)
                 
+                reward = torch.zeros(batch_size, dtype=torch.float32).to(torchDevice)
                 if clip_frame > 12:
                     v1_out = visual_cortex_net(output)
                     tot_loss_class_to_pos = []
@@ -259,8 +260,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                    
                     if last_v1_out is not None:
                         current_loss = tot_loss_sum.clone().detach().float()
-                        reward = (last_loss - current_loss).detach()
-                        memory.append((last_v1_out.clone(), last_action_idx, reward))
+                        reward += (last_loss - current_loss).detach()
                     
                     last_loss = tot_loss_sum.clone().detach().float()
                     last_v1_out = v1_out
@@ -281,7 +281,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     writer.add_scalar("Loss/Class-has-Below-Above-Loss", torch.mean(tot_loss_class_has_below_above).item(), episode)
                    
                     #writer.add_scalar("Loss/Loss-Approximation-Loss", tot_loss_loss_aprox.item(), episode)
-                    episode += 1
+                    
 
                     if episode % 500 == 0:
                         torch.save(lgn_net.state_dict(), 'active-models/lgn-net.mdl')
@@ -297,36 +297,38 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         torch.save(optimizer.state_dict(), 'active-models/optimizer.opt')
 
                 last_action_idx = action_idx
-                action_idx = torch.argmax(q_net(output),dim=1).cpu().numpy()
+                q_net_out = q_net(output)
+                action_idx = torch.argmax(q_net_out,dim=1).cpu().numpy()
+
+                memory.append((q_net_out.clone(), last_action_idx, reward))
 
                 for scene_idx in range(len(action_idx)):
                     if eps > np.random.random():
                         action_idx[scene_idx] = randint(0, len(config.actions) - 1)
                 
-                eps **= eps_decay
+                eps *= eps_decay
 
-
-
-
-
-            rl_loss = torch.tensor(0.0, dtype=torch.float32).to(torchDevice)
+            rl_loss = [] #torch.tensor(0.0, dtype=torch.float32).to(torchDevice)
             for i in range(len(memory)):
                 mem = memory[i]
-                v1_out = mem[0]
+                q_values = mem[0]
                 action_idx = mem[1]
                 reward = mem[2].clone()
 
-                q_values = q_net(v1_out)
+                #q_values = q_net(v1_out)
                 print(q_values)
                 for r in range(i + 1, len(memory)):
-                    future_mem = memory[i]
-                    reward += 0.96**r * future_mem[2]
+                    future_mem = memory[r]
+                    reward += 0.99**r * future_mem[2]
 
                 q_loss = q_net.loss(action_idx, q_values, reward)
-                rl_loss += q_loss*0.1
+                rl_loss += [q_loss]
 
-                writer.add_scalar("Loss/Q-Net-Loss", torch.mean(q_loss).item(), episode - len(memory) + i + 1)
+            rl_loss = torch.mean(torch.stack(rl_loss))
+            writer.add_scalar("Loss/Q-Net-Loss", torch.mean(rl_loss).item(), episode)
             rl_loss.backward()
+
+            episode += 1
             
 
     plt.plot(episodes, losses)

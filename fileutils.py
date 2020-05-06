@@ -40,7 +40,7 @@ def col_loss(col, col_predict):
 
 
 def reshape_frame(rgb, depth):
-    frame_input = np.zeros((4,h,w))
+    frame_input = np.zeros((4,h,w), dtype=np.float32)
     frame_input[0,:,:] = rgb[:,:,0]
     frame_input[1,:,:] = rgb[:,:,1]
     frame_input[2,:,:] = rgb[:,:,2]
@@ -66,7 +66,7 @@ def load_batch():
         rgb_frames, depth_frames, scene_data = load_scene_data(scene_id)
         is_reversed = False # np.random.random() < 0.5
 
-        frame_input = np.zeros((4,w,h))
+        frame_input = np.zeros((4,w,h), dtype=np.float32)
         for frame in range(sequence_length):
             frame_idx = frame
             if is_reversed:
