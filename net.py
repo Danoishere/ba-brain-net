@@ -393,10 +393,10 @@ class ObjCountNet(nn.Module):
                 
         return loss_pos + loss_col + loss_shape + loss_has_more
 
-# (vent_in, dors_in, shape, col) -> hasAboveNet
-class ClassHasObjectBelowAboveNet(nn.Module):
+# (vent_in, dors_in, shape, col) -> hasAboveBelowNet
+class HasObjectBelowAboveNet(nn.Module):
     def __init__(self, torchDevice):
-        super(ClassHasObjectBelowAboveNet, self).__init__()
+        super(HasObjectBelowAboveNet, self).__init__()
         self.lrelu = nn.LeakyReLU()
         self.fc1 = nn.Linear(2048 + 256, 2048)
         self.fc2 = nn.Linear(2048, 1024)
@@ -462,3 +462,57 @@ class LossApproximationNet(nn.Module):
 
     def loss(self, y_pred_norm_loss, y_target_norm_loss):
         return self.norm_loss_criterion(y_pred_norm_loss, y_target_norm_loss)
+
+
+
+class ClassBelowAboveNet(nn.Module):
+    def __init__(self, torchDevice):
+        super(ClassBelowAboveNet, self).__init__()
+        self.lrelu = nn.LeakyReLU()
+        self.fc1 = nn.Linear(2048 + 256, 2048)
+        self.fc2 = nn.Linear(2048, 1024)
+        self.fc3 = nn.Linear(1024, 1024)
+        self.fc4 = nn.Linear(1024, 64)
+        #self.fc5 = nn.Linear(64, 3)
+
+        self.side_fc1 = nn.Linear(12, 64)
+        self.side_fc2 = nn.Linear(64, 256)
+        self.side_fc3 = nn.Linear(256, 256)
+
+        self.logits_col = nn.Linear(64, 8)
+        self.logits_shape = nn.Linear(64, 6)
+
+        self.col_criterion = nn.CrossEntropyLoss().to(torchDevice)
+        self.shape_criterion = nn.CrossEntropyLoss().to(torchDevice)
+
+
+    def forward(self, v1_in, col, shape): #TODO: check if still using side?
+        side = torch.cat((col, shape), 1)
+        side = self.side_fc1(side)
+        side = self.lrelu(side)
+        side = self.side_fc2(side)
+        side = self.lrelu(side)
+        side = self.side_fc3(side)
+        side = self.lrelu(side)
+
+        out = torch.cat((v1_in, side), 1)
+        out = self.fc1(out)
+        out = self.lrelu(out)
+        out = self.fc2(out)
+        out = self.lrelu(out)
+        out = self.fc3(out)
+        out = self.lrelu(out)
+        out = self.fc4(out)
+        out = self.lrelu(out)
+        #out = self.fc5(out)
+
+        col = self.logits_col(out)
+        shape = self.logits_shape(out)
+        return col, shape
+
+
+    def loss(self, pred_col_logits, pred_shape_logits, target_col_idx, target_shape_idx):
+        col_loss = self.col_criterion(pred_col_logits, target_col_idx)
+        shape_loss = self.shape_criterion(pred_shape_logits, target_shape_idx)
+        total_loss = col_loss + shape_loss
+        return total_loss
