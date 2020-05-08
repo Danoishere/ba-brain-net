@@ -1,4 +1,3 @@
-
 import zipfile
 import glob, os
 import re
@@ -283,7 +282,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     tot_loss_class_has_below_above = torch.stack(tot_loss_class_has_below_above)
                     tot_loss_class_has_below_above = torch.mean(tot_loss_class_has_below_above,dim=0)
 					
-					tot_loss_neighbour_obj = torch.stack(tot_loss_neighbour_obj)
+                    tot_loss_neighbour_obj = torch.stack(tot_loss_neighbour_obj)
                     tot_loss_neighbour_obj = torch.mean(tot_loss_neighbour_obj)
 
                     print('Episode', episode,', Clip Frame',clip_frame,'Action', action_idx, ', Loss Pos.:', torch.mean(tot_loss_class_to_pos).item(), ", Eps.", eps)
