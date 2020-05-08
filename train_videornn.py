@@ -9,12 +9,18 @@ import numpy as np
 import net
 from net import Query
 import matplotlib.pyplot as plt
-from random import shuffle, randint
+from random import shuffle, randint, choice
 from autoencoder import ConvAutoencoder
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 import config
 
+def action_idx_to_action(indices):
+    actions = []
+    for idx in indices:
+        actions.append(config.actions[idx])
+
+    return np.array(actions,dtype=np.int)
 
 def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
@@ -42,7 +48,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     lgn_net.train()
 
     visual_cortex_net = net.VisualCortexNet().to(torchDevice)
-    visual_cortex_net.load_state_dict(torch.load('active-models/visual-cortex-net.mdl', map_location=torchDevice))
+    #visual_cortex_net.load_state_dict(torch.load('active-models/visual-cortex-net.mdl', map_location=torchDevice))
     visual_cortex_net.train()
 
     class_to_pos_net = net.ClassToPosNet().to(torchDevice)
@@ -65,9 +71,9 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     #has_below_above_net.load_state_dict(torch.load('active-models/classbelowabovenet-model.mdl', map_location=torchDevice))
     has_below_above_net.train()
 
-    loss_aprox_net = net.LossApproximationNet(torchDevice).to(torchDevice)
-    #loss_pred_net.load_state_dict(torch.load('active-models/loss-aprox-net-model.mdl', map_location=torchDevice))
-    loss_aprox_net.train()
+    q_net = net.QNet(torchDevice).to(torchDevice)
+    #q_net.load_state_dict(torch.load('active-models/q-net-model.mdl', map_location=torchDevice))
+    q_net.train()
 
     class_below_above_net = net.ClassBelowAboveNet(torchDevice).to(torchDevice)
     #class_below_above_net.load_state_dict(torch.load('active-models/classbelowabovenet-model.mdl'. map_location=torchDevice)) #TODO: change model name here!
@@ -82,7 +88,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     params += list(uv_to_class_net.parameters())
     params += list(count_net.parameters())
     params += list(has_below_above_net.parameters())
-    params += list(loss_aprox_net.parameters())
+    params += list(q_net.parameters())
     params += list(class_below_above_net.parameters())
 
     optimizer = torch.optim.Adam(params, lr=lr)
@@ -91,9 +97,13 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     episodes = []
 
     episode = 0
+    rl_episode = 0
     num_queries = config.num_queries
     skip = config.skip_factor
 
+    eps = 1.0
+    eps_min = 0.01
+    eps_decay = 0.9999
     
     while True:
         last_frame = 0
@@ -101,27 +111,39 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
         # Pass batch frame by frame
 
         for repetition in range(3):
-            start_frame = randint(0, sequence_length - 1)
-            clip_length = randint(16, 24) + 1
-            
+            frame = np.random.randint(0, sequence_length, batch_size)
+
+            clip_length = randint(16, 24)
             optimizer.zero_grad()
             lgn_net.init_hidden(torchDevice)
-
+            
+            #last_action = 3
+            last_v1_out = None
             clip_frame = 0
-            for frame in range(start_frame, start_frame + clip_length):
+            action_idx = np.ones(batch_size, dtype=np.int)*3
+            memory = []
+            first_action_taken = False
+            
+            for step in range(clip_length):
                 clip_frame += 1
-                current_frame = frame % sequence_length # int(frame*skip + offset)
-                # print(current_frame)
-                frame_input = torch.tensor(batch_x[current_frame], requires_grad=True).float().to(torchDevice)
+
+                frame += action_idx_to_action(action_idx)
+                current_frame = frame % sequence_length
+
+                frame_input = np.zeros((batch_size, 4, config.w, config.h))
+                for i in range(batch_size):
+                    frame_input[i] = batch_x[current_frame[i],i]
+
+                frame_input = torch.tensor(frame_input, requires_grad=True, dtype=torch.float32).to(torchDevice)
+                
                 encoded = cae.encode(frame_input)
                 output = encoded.reshape(batch_size, -1)
                 output = lgn_net(output)
-                last_frame = current_frame
-
+                v1_out = visual_cortex_net(output)
+                
+                reward = torch.zeros(batch_size, dtype=torch.float32).to(torchDevice)
+                
                 if clip_frame > 12:
-
-                    v1_out = visual_cortex_net(output)
-
                     tot_loss_class_to_pos = []
                     tot_loss_pos_to_class = []
                     tot_loss_uv_to_class = []
@@ -132,7 +154,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     # Sample 10 different objects combinations from each training batch.
                     for i in range(num_queries):
                         # Predict color, based on location
-                        # y_target_pos = []
                         y_target_rel_pos = []
                         y_target_has_below_above = []
                         
@@ -147,15 +168,15 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         all_objs = []
                         all_cam_pos = []
                         
-
+                        scene_idx = 0
                         for scene in scenes:
                             scene_objects = scene["objects"]
                             rnd_obj = np.random.choice(list(scene_objects.keys()))
 
-                            last_frame_transf_mat = np.array(scene["cam_base_matricies"][last_frame])
+                            last_frame_transf_mat = np.array(scene["cam_base_matricies"][current_frame[scene_idx]])
                             last_frame_transf_mat_inv = np.linalg.inv(last_frame_transf_mat)
 
-                            last_frame_uv = scene["ss_objs"][last_frame][rnd_obj]
+                            last_frame_uv = scene["ss_objs"][current_frame[scene_idx]][rnd_obj]
                             all_uvs.append([last_frame_uv["screen_x"], last_frame_uv["screen_y"]])
                             
                             obj_pos = scene_objects[rnd_obj]['pos']
@@ -164,7 +185,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
                             obj_col_idx = colors.index(scene_objects[rnd_obj]['color-name'])
                             obj_shape_idx = shapes.index(rnd_obj.split("-")[0])
-                            
 
                             obj_has_above = 'is_below' in scene_objects[rnd_obj].keys() #is below -> has above
                             obj_has_below = 'is_above' in scene_objects[rnd_obj].keys() #is above -> has below
@@ -189,7 +209,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                             neighbour_obj_col_idx = colors_n.index(neighbour_obj_color)
 
 
-
                             obj_col_oh = np.zeros(len(colors))
                             obj_col_oh[obj_col_idx] = 1.0
                             obj_shape_oh = np.zeros(len(shapes))
@@ -205,6 +224,8 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                             neighbour_obj_shape_indices.append(neighbour_obj_shape_idx)
                             neighbour_obj_col_indices.append(neighbour_obj_col_idx)
 
+                            scene_idx += 1
+
                         # oh = one-hot
                         y_col_oh = torch.tensor(obj_col_onehots, requires_grad=True, dtype=torch.float32).to(torchDevice)
                         y_shape_oh = torch.tensor(obj_shape_onehots, requires_grad=True, dtype=torch.float32).to(torchDevice)
@@ -215,7 +236,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         y_has_below_above_idx = torch.tensor(below_above_indices, dtype=torch.long).to(torchDevice)
                         y_neighbour_obj_shape_idx = torch.tensor(neighbour_obj_shape_indices, dtype=torch.long).to(torchDevice)
                         y_neighbour_obj_col_idx = torch.tensor(neighbour_obj_col_indices, dtype=torch.long).to(torchDevice)
-
 
                         # Find position loss
                         y_pred_pos = class_to_pos_net(v1_out, y_col_oh, y_shape_oh)
@@ -252,42 +272,46 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     tot_loss_countnet = count_net.loss(p_dones, p_cols, p_shapes, p_pos, scenes, last_frame)
 
                     tot_loss_class_to_pos = torch.stack(tot_loss_class_to_pos)
-                    tot_loss_class_to_pos = torch.mean(tot_loss_class_to_pos)
+                    tot_loss_class_to_pos = torch.mean(tot_loss_class_to_pos,dim=0)
 
                     tot_loss_pos_to_class = torch.stack(tot_loss_pos_to_class)
-                    tot_loss_pos_to_class = torch.mean(tot_loss_pos_to_class)
+                    tot_loss_pos_to_class = torch.mean(tot_loss_pos_to_class,dim=0)
 
                     tot_loss_uv_to_class = torch.stack(tot_loss_uv_to_class)
-                    tot_loss_uv_to_class = torch.mean(tot_loss_uv_to_class)
+                    tot_loss_uv_to_class = torch.mean(tot_loss_uv_to_class,dim=0)
 
                     tot_loss_class_has_below_above = torch.stack(tot_loss_class_has_below_above)
-                    tot_loss_class_has_below_above = torch.mean(tot_loss_class_has_below_above)
-
-                    tot_loss_neighbour_obj = torch.stack(tot_loss_neighbour_obj)
+                    tot_loss_class_has_below_above = torch.mean(tot_loss_class_has_below_above,dim=0)
+					
+					tot_loss_neighbour_obj = torch.stack(tot_loss_neighbour_obj)
                     tot_loss_neighbour_obj = torch.mean(tot_loss_neighbour_obj)
 
-                    print('Episode', episode,', Clip Frame',clip_frame, ', Loss Pos.:', tot_loss_class_to_pos.item())
+                    print('Episode', episode,', Clip Frame',clip_frame,'Action', action_idx, ', Loss Pos.:', torch.mean(tot_loss_class_to_pos).item(), ", Eps.", eps)
 
                     tot_loss_sum = tot_loss_class_to_pos + tot_loss_pos_to_class + tot_loss_uv_to_class + tot_loss_countnet + tot_loss_class_has_below_above + tot_loss_neighbour_obj
+                    loss = torch.tensor(0.0, dtype=torch.float32).to(torchDevice)
+                   
+                    if last_v1_out is not None:
+                        current_loss = tot_loss_sum.clone().detach().float()
+                        reward += (last_loss - current_loss).detach()
+                    
+                    last_loss = tot_loss_sum.clone().detach().float()
+                    last_v1_out = v1_out
 
-                    norm_tot_loss = torch.tanh(0.05 * tot_loss_sum.clone().detach())
-                    pred_norm_loss = loss_aprox_net(v1_out)
-                    tot_loss_loss_aprox = loss_aprox_net.loss(pred_norm_loss, norm_tot_loss)
-                    tot_loss_sum += tot_loss_loss_aprox
-
-                    tot_loss_sum.backward(retain_graph=True)
-                    #nn.utils.clip_grad_norm_(params, 0.025)
+                    tot_loss_sum = torch.mean(tot_loss_sum)
+                    
+                    loss += tot_loss_sum
+                    loss.backward(retain_graph=True)
                     optimizer.step()
                     
+
                     episodes.append(episode)
-                    writer.add_scalar("Loss/Class-to-Position-Loss", tot_loss_class_to_pos.item(), episode)
-                    writer.add_scalar("Loss/Position-to-Class-Loss", tot_loss_pos_to_class.item(), episode)
-                    writer.add_scalar("Loss/UV-to-Class-Loss", tot_loss_uv_to_class.item(), episode)
-                    writer.add_scalar("Loss/Obj-Count-Loss", tot_loss_countnet.item(), episode)
-                    writer.add_scalar("Loss/Has-Below-Above-Loss", tot_loss_class_has_below_above.item(), episode)
-                    writer.add_scalar("Loss/Class-has-Below-Above-Loss", tot_loss_neighbour_obj.item(), episode)
-                    writer.add_scalar("Loss/Loss-Approximation-Loss", tot_loss_loss_aprox.item(), episode)
-                    episode += 1
+                    writer.add_scalar("Loss/Class-to-Position-Loss", torch.mean(tot_loss_class_to_pos).item(), episode)
+                    writer.add_scalar("Loss/Position-to-Class-Loss", torch.mean(tot_loss_pos_to_class).item(), episode)
+                    writer.add_scalar("Loss/UV-to-Class-Loss", torch.mean(tot_loss_uv_to_class).item(), episode)
+                    writer.add_scalar("Loss/Obj-Count-Loss", torch.mean(tot_loss_countnet).item(), episode)
+                    writer.add_scalar("Loss/Class-has-Below-Above-Loss", torch.mean(tot_loss_class_has_below_above).item(), episode)
+                                      
 
                     if episode % 500 == 0:
                         torch.save(lgn_net.state_dict(), 'active-models/lgn-net.mdl')
@@ -299,9 +323,52 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         torch.save(count_net.state_dict(), 'active-models/countnet-model.mdl')
                         torch.save(has_below_above_net.state_dict(), 'active-models/classbelowabovenet-model.mdl')
                         torch.save(class_below_above_net.state_dict(), 'active-models/neighbour-obj-model.mdl')
-                        torch.save(loss_aprox_net.state_dict(), 'active-models/loss-aprox-net-model.mdl')
+                        torch.save(q_net.state_dict(), 'active-models/q-net-model.mdl')
                         torch.save(optimizer.state_dict(), 'active-models/optimizer.opt')
 
+                    episode += 1
+
+                if first_action_taken:
+                    memory.append((q_net_out, action_idx, reward))
+
+                q_net_out = q_net(v1_out)
+                first_action_taken = True
+                action_idx = torch.argmax(q_net_out,dim=1).cpu().numpy()
+
+                for scene_idx in range(len(action_idx)):
+                    if eps > np.random.random():
+                        action_idx[scene_idx] = randint(0, len(config.actions) - 1)
+                
+            eps *= eps_decay
+            eps = max([eps_min, eps])
+
+
+            rl_loss = [] #torch.tensor(0.0, dtype=torch.float32).to(torchDevice)
+            for i in range(len(memory)):
+                mem = memory[i]
+                q_values = mem[0]
+                action_idx = mem[1]
+                reward = mem[2].clone()
+
+                #q_values = q_net(v1_out)
+                print(q_values)
+                discount = 0
+                for r in range(i + 1, len(memory)):
+                    future_mem = memory[r]
+                    reward += 0.99**discount * future_mem[2]
+                    discount += 1
+
+                q_loss = q_net.loss(action_idx, q_values, reward)
+                rl_loss += [q_loss]
+
+            rl_loss = torch.mean(torch.stack(rl_loss))
+            writer.add_scalar("Loss/Q-Net-Loss", torch.mean(rl_loss).item(), rl_episode)
+            rl_episode += 1
+            rl_loss = torch.clamp_max(rl_loss, 5.0)
+            rl_loss.backward()
+
+            
+            
 
     plt.plot(episodes, losses)
     plt.show()
