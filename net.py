@@ -331,15 +331,13 @@ class ObjCountNet(nn.Module):
         diff_sum_sqrt = torch.sqrt(diff)
         return diff_sum_sqrt
 
-    def loss(self, l_has_more, l_col, l_shape, l_pos, scenes, last_frame):
+    def loss(self, l_has_more, l_col, l_shape, l_pos, scenes, current_frame):
         scene_objects = []
         for scene in scenes:
             objs = []
             for obj in scene['objects']:
                 objs.append((obj, scene['objects'][obj]))
             scene_objects.append(objs)
-
-        
 
         pred_pos = torch.stack(l_pos)
         loss_batch = []
@@ -350,7 +348,7 @@ class ObjCountNet(nn.Module):
             # 1 = found more, 0 = all objects outputted
             loss_has_more = []
             # Calculate transformation matrix for relative positions
-            scene_cam_mat = np.array(scene["cam_base_matricies"][last_frame])
+            scene_cam_mat = np.array(scene["cam_base_matricies"][current_frame[s]])
             scene_cam_mat = np.linalg.inv(scene_cam_mat)
 
             scene = scenes[s]
