@@ -504,7 +504,6 @@ class ClassBelowAboveNet(nn.Module):
         self.fc2 = nn.Linear(2048, 1024)
         self.fc3 = nn.Linear(1024, 1024)
         self.fc4 = nn.Linear(1024, 64)
-        #self.fc5 = nn.Linear(64, 3)
 
         self.side_fc1 = nn.Linear(12, 64)
         self.side_fc2 = nn.Linear(64, 256)
@@ -517,7 +516,7 @@ class ClassBelowAboveNet(nn.Module):
         self.shape_criterion = nn.CrossEntropyLoss().to(torchDevice)
 
 
-    def forward(self, v1_in, col, shape): #TODO: check if still using side?
+    def forward(self, v1_in, col, shape):
         side = torch.cat((col, shape), 1)
         side = self.side_fc1(side)
         side = self.lrelu(side)
@@ -535,7 +534,6 @@ class ClassBelowAboveNet(nn.Module):
         out = self.lrelu(out)
         out = self.fc4(out)
         out = self.lrelu(out)
-        #out = self.fc5(out)
 
         col = self.logits_col(out)
         shape = self.logits_shape(out)

@@ -67,7 +67,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     count_net.train()
 
     has_below_above_net = net.HasObjectBelowAboveNet(torchDevice).to(torchDevice)
-    #has_below_above_net.load_state_dict(torch.load('active-models/classbelowabovenet-model.mdl', map_location=torchDevice))
+    has_below_above_net.load_state_dict(torch.load('active-models/classbelowabovenet-model.mdl', map_location=torchDevice))
     has_below_above_net.train()
 
     q_net = net.QNet(torchDevice).to(torchDevice)
@@ -75,7 +75,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     q_net.train()
 
     class_below_above_net = net.ClassBelowAboveNet(torchDevice).to(torchDevice)
-    #class_below_above_net.load_state_dict(torch.load('active-models/classbelowabovenet-model.mdl'. map_location=torchDevice)) #TODO: change model name here!
+    #class_below_above_net.load_state_dict(torch.load('active-models/neighbour-obj-model.mdl'. map_location=torchDevice)) #TODO: activate when available
     class_below_above_net.train()
 
     params = []
@@ -299,7 +299,8 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     writer.add_scalar("Loss/Position-to-Class-Loss", torch.mean(tot_loss_pos_to_class).item(), episode)
                     writer.add_scalar("Loss/UV-to-Class-Loss", torch.mean(tot_loss_uv_to_class).item(), episode)
                     writer.add_scalar("Loss/Obj-Count-Loss", torch.mean(tot_loss_countnet).item(), episode)
-                    writer.add_scalar("Loss/Class-has-Below-Above-Loss", torch.mean(tot_loss_class_has_below_above).item(), episode)
+                    writer.add_scalar("Loss/Has-Below-Above-Loss", torch.mean(tot_loss_class_has_below_above).item(), episode)
+                    writer.add_scalar("Loss/Class-Below-Above-Loss", torch.mean(tot_loss_neighbour_obj).item(), episode)
                                       
 
                     if episode % 500 == 0:
