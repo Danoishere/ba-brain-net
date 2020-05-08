@@ -47,7 +47,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     lgn_net.train()
 
     visual_cortex_net = net.VisualCortexNet().to(torchDevice)
-    #visual_cortex_net.load_state_dict(torch.load('active-models/visual-cortex-net.mdl', map_location=torchDevice))
+    visual_cortex_net.load_state_dict(torch.load('active-models/visual-cortex-net.mdl', map_location=torchDevice))
     visual_cortex_net.train()
 
     class_to_pos_net = net.ClassToPosNet().to(torchDevice)
@@ -71,7 +71,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     has_below_above_net.train()
 
     q_net = net.QNet(torchDevice).to(torchDevice)
-    #q_net.load_state_dict(torch.load('active-models/q-net-model.mdl', map_location=torchDevice))
+    q_net.load_state_dict(torch.load('active-models/q-net-model.mdl', map_location=torchDevice))
     q_net.train()
 
     class_below_above_net = net.ClassBelowAboveNet(torchDevice).to(torchDevice)
@@ -105,19 +105,15 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     eps_decay = 0.9999
     
     while True:
-        last_frame = 0
         batch_x, scenes = queue.get()
-        # Pass batch frame by frame
 
         for repetition in range(3):
             frame = np.random.randint(0, sequence_length, batch_size)
-
-            clip_length = randint(16, 24)
+            clip_length = 18 # randint(16, 24)
             optimizer.zero_grad()
             lgn_net.init_hidden(torchDevice)
             
-            #last_action = 3
-            last_v1_out = None
+            first_loss_initialized = False
             clip_frame = 0
             action_idx = np.ones(batch_size, dtype=np.int)*3
             memory = []
@@ -125,13 +121,12 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
             
             for step in range(clip_length):
                 clip_frame += 1
-
                 frame += action_idx_to_action(action_idx)
-                current_frame = frame % sequence_length
+                frame = frame % sequence_length
 
                 frame_input = np.zeros((batch_size, 4, config.w, config.h))
                 for i in range(batch_size):
-                    frame_input[i] = batch_x[current_frame[i],i]
+                    frame_input[i] = batch_x[frame[i],i]
 
                 frame_input = torch.tensor(frame_input, requires_grad=True, dtype=torch.float32).to(torchDevice)
                 
@@ -166,16 +161,16 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         neighbour_obj_shape_indices = []
                         all_objs = []
                         all_cam_pos = []
-                        
-                        scene_idx = 0
-                        for scene in scenes:
+    
+                        for scene_idx in range(len(scenes)):
+                            scene = scenes[scene_idx]
                             scene_objects = scene["objects"]
                             rnd_obj = np.random.choice(list(scene_objects.keys()))
 
-                            last_frame_transf_mat = np.array(scene["cam_base_matricies"][current_frame[scene_idx]])
+                            last_frame_transf_mat = np.array(scene["cam_base_matricies"][frame[scene_idx]])
                             last_frame_transf_mat_inv = np.linalg.inv(last_frame_transf_mat)
 
-                            last_frame_uv = scene["ss_objs"][current_frame[scene_idx]][rnd_obj]
+                            last_frame_uv = scene["ss_objs"][frame[scene_idx]][rnd_obj]
                             all_uvs.append([last_frame_uv["screen_x"], last_frame_uv["screen_y"]])
                             
                             obj_pos = scene_objects[rnd_obj]['pos']
@@ -223,8 +218,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                             neighbour_obj_shape_indices.append(neighbour_obj_shape_idx)
                             neighbour_obj_col_indices.append(neighbour_obj_col_idx)
 
-                            scene_idx += 1
-
                         # oh = one-hot
                         y_col_oh = torch.tensor(obj_col_onehots, requires_grad=True, dtype=torch.float32).to(torchDevice)
                         y_shape_oh = torch.tensor(obj_shape_onehots, requires_grad=True, dtype=torch.float32).to(torchDevice)
@@ -268,7 +261,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     """
 
                     p_dones, p_cols, p_shapes, p_pos = count_net(v1_out)
-                    tot_loss_countnet = count_net.loss(p_dones, p_cols, p_shapes, p_pos, scenes, last_frame)
+                    tot_loss_countnet = count_net.loss(p_dones, p_cols, p_shapes, p_pos, scenes, frame)
 
                     tot_loss_class_to_pos = torch.stack(tot_loss_class_to_pos)
                     tot_loss_class_to_pos = torch.mean(tot_loss_class_to_pos,dim=0)
@@ -290,20 +283,17 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     tot_loss_sum = tot_loss_class_to_pos + tot_loss_pos_to_class + tot_loss_uv_to_class + tot_loss_countnet + tot_loss_class_has_below_above + tot_loss_neighbour_obj
                     loss = torch.tensor(0.0, dtype=torch.float32).to(torchDevice)
                    
-                    if last_v1_out is not None:
+                    if first_loss_initialized:
                         current_loss = tot_loss_sum.clone().detach().float()
                         reward += (last_loss - current_loss).detach()
                     
                     last_loss = tot_loss_sum.clone().detach().float()
-                    last_v1_out = v1_out
+                    first_loss_initialized = True
 
-                    tot_loss_sum = torch.mean(tot_loss_sum)
+                    loss += torch.mean(tot_loss_sum)
+                    #loss.backward(retain_graph=True)
+                    #optimizer.step()
                     
-                    loss += tot_loss_sum
-                    loss.backward(retain_graph=True)
-                    optimizer.step()
-                    
-
                     episodes.append(episode)
                     writer.add_scalar("Loss/Class-to-Position-Loss", torch.mean(tot_loss_class_to_pos).item(), episode)
                     writer.add_scalar("Loss/Position-to-Class-Loss", torch.mean(tot_loss_pos_to_class).item(), episode)
@@ -341,8 +331,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
             eps *= eps_decay
             eps = max([eps_min, eps])
 
-
-            rl_loss = [] #torch.tensor(0.0, dtype=torch.float32).to(torchDevice)
+            rl_loss = []
             for i in range(len(memory)):
                 mem = memory[i]
                 q_values = mem[0]
@@ -361,12 +350,12 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                 rl_loss += [q_loss]
 
             rl_loss = torch.mean(torch.stack(rl_loss))
-            writer.add_scalar("Loss/Q-Net-Loss", torch.mean(rl_loss).item(), rl_episode)
+            writer.add_scalar("Loss/Q-Net-Loss", rl_loss.item(), rl_episode)
             rl_episode += 1
             rl_loss = torch.clamp_max(rl_loss, 5.0)
-            rl_loss.backward()
-
-            
+            loss += rl_loss
+            loss.backward()
+            optimizer.step()            
             
 
     plt.plot(episodes, losses)
