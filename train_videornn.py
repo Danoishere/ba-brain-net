@@ -311,7 +311,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     del y_pred_pos, y_pred_col, y_pred_shape, y_pred_has_below_above,y_pred_neighbour_obj_col, y_pred_neighbour_obj_shape
 
                     if episode % 500 == 0:
-                        torch.save(lgn_net.state_dict(), 'active-models/lgn-net.mdl')
                         torch.save(visual_cortex_net.state_dict(), 'active-models/visual-cortex-net.mdl')
                         torch.save(class_to_pos_net.state_dict(), 'active-models/posnet-model.mdl')
                         torch.save(pos_to_class_net.state_dict(), 'active-models/colnet-model.mdl')
