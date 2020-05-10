@@ -3,6 +3,7 @@ import torch.nn as nn
 from enum import Enum
 import config
 import numpy as np
+from convlstm import ConvLSTM
 
 from scipy.spatial.distance import cdist
 from scipy.optimize import linear_sum_assignment
@@ -12,31 +13,6 @@ class Query(Enum):
     COL = 2
 
 batch_size = config.batch_size
-
-class VisionNet(nn.Module):
-    def __init__(self):
-        super(VisionNet, self).__init__()
-        self.hidden_dim = 2048
-        self.lrelu = nn.LeakyReLU()
-        self.n_layers = 1
-        self.rnn = nn.LSTM(2048, self.hidden_dim, self.n_layers)
-
-
-    def init_hidden(self, torchDevice):
-        # This method generates the first hidden state of zeros which we'll use in the forward pass
-        # We'll send the tensor holding the hidden state to the device we specified earlier as well
-        self.hidden = (torch.zeros(self.n_layers, batch_size, self.hidden_dim).to(torchDevice),
-                       torch.zeros(self.n_layers, batch_size, self.hidden_dim).to(torchDevice))
-
-
-    def forward(self, frame):
-        # (Sequence Length, Batch size, Inputs)
-        out = frame.reshape(1, batch_size, -1)
-        out, hidden = self.rnn(out, self.hidden)
-        self.hidden = hidden
-        out = out.reshape(batch_size, -1)
-        out = self.lrelu(out)
-        return out
 
 class VisualCortexNet(nn.Module):
     def __init__(self):
