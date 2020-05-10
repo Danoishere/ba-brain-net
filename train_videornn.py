@@ -13,10 +13,12 @@ from autoencoder import ConvAutoencoder
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 import config
-
+from matplotlib.ticker import MaxNLocator
 import gc
 import psutil
 import sys
+
+plt.style.use('seaborn')
 
 def action_idx_to_action(indices):
     actions = []
@@ -43,102 +45,94 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
     cae = ConvAutoencoder().to(torchDevice)
     cae.load_state_dict(torch.load('active-models/cae-model.mdl', map_location=torchDevice))
-    cae.train()
+    cae.eval()
 
     lgn_net = net.VisionNet().to(torchDevice)
     lgn_net.load_state_dict(torch.load('active-models/lgn-net.mdl', map_location=torchDevice))
-    lgn_net.train()
+    lgn_net.eval()
 
     visual_cortex_net = net.VisualCortexNet().to(torchDevice)
     visual_cortex_net.load_state_dict(torch.load('active-models/visual-cortex-net.mdl', map_location=torchDevice))
-    visual_cortex_net.train()
+    visual_cortex_net.eval()
 
     class_to_pos_net = net.ClassToPosNet().to(torchDevice)
     class_to_pos_net.load_state_dict(torch.load('active-models/posnet-model.mdl', map_location=torchDevice))
-    class_to_pos_net.train()
+    class_to_pos_net.eval()
 
     pos_to_class_net = net.PosToClass(torchDevice).to(torchDevice)
     pos_to_class_net.load_state_dict(torch.load('active-models/colnet-model.mdl', map_location=torchDevice))
-    pos_to_class_net.train()
+    pos_to_class_net.eval()
 
     uv_to_class_net = net.UVToClass(torchDevice).to(torchDevice)
     uv_to_class_net.load_state_dict(torch.load('active-models/uvtoclass-model.mdl', map_location=torchDevice))
-    uv_to_class_net.train()
+    uv_to_class_net.eval()
 
     count_net = net.ObjCountNet(torchDevice).to(torchDevice)
     count_net.load_state_dict(torch.load('active-models/countnet-model.mdl', map_location=torchDevice))
-    count_net.train()
+    count_net.eval()
 
     has_below_above_net = net.HasObjectBelowAboveNet(torchDevice).to(torchDevice)
     has_below_above_net.load_state_dict(torch.load('active-models/classbelowabovenet-model.mdl', map_location=torchDevice))
-    has_below_above_net.train()
+    has_below_above_net.eval()
 
     q_net = net.QNet(torchDevice).to(torchDevice)
     q_net.load_state_dict(torch.load('active-models/q-net-model.mdl', map_location=torchDevice))
-    q_net.train()
+    q_net.eval()
 
     class_below_above_net = net.ClassBelowAboveNet(torchDevice).to(torchDevice)
     #class_below_above_net.load_state_dict(torch.load('active-models/neighbour-obj-model.mdl'. map_location=torchDevice)) #TODO: activate when available
-    class_below_above_net.train()
+    class_below_above_net.eval()
+    for m in range(3):
+        episode = 0
+        rl_episode = 0
+        num_queries = config.num_queries
+        skip = config.skip_factor
 
-    params = []
-    params += list(cae.parameters())
-    params += list(lgn_net.parameters())
-    params += list(visual_cortex_net.parameters())
-    params += list(class_to_pos_net.parameters())
-    params += list(pos_to_class_net.parameters())
-    params += list(uv_to_class_net.parameters())
-    params += list(count_net.parameters())
-    params += list(has_below_above_net.parameters())
-    params += list(q_net.parameters())
-    params += list(class_below_above_net.parameters())
+        eps = 1.0
+        eps_min = 0.01
+        eps_decay = 0.9999
 
-    optimizer = torch.optim.RMSprop(params, lr=lr) #.Adam(params, lr=lr)
-
-    episode = 0
-    rl_episode = 0
-    num_queries = config.num_queries
-    skip = config.skip_factor
-
-    eps = 1.0
-    eps_min = 0.01
-    eps_decay = 0.9999
+        """
+        plt.imshow(np.zeros((128,128,3)))
+        plt.ion()
+        plt.show()
+        """
+        success = [[] for i in list(range(18))]
     
-    while True:
-        batch_x, scenes = queue.get()
 
-        for repetition in range(3):
-            frame = np.random.randint(0, sequence_length, batch_size)
-            clip_length = 18
-            optimizer.zero_grad()
-            lgn_net.init_hidden(torchDevice)
-            
-            first_loss_initialized = False
-            clip_frame = 0
-            action_idx = np.ones(batch_size, dtype=np.int)*3
-            memory = []
-            first_action_taken = False
-            
-            loss = torch.tensor(0.0, dtype=torch.float32).to(torchDevice)
-            for step in range(clip_length):
-                clip_frame += 1
-                frame += action_idx_to_action(action_idx)
-                frame = frame % sequence_length
+        for i in range(200):
+            batch_x, scenes = queue.get()
 
-                frame_input = np.zeros((batch_size, 4, config.w, config.h))
-                for i in range(batch_size):
-                    frame_input[i] = batch_x[frame[i],i]
+            for repetition in range(1):
+                frame = np.random.randint(0, sequence_length, batch_size)
+                clip_length = 18
+                lgn_net.init_hidden(torchDevice)
+                
+                first_loss_initialized = False
+                clip_frame = 0
+                action_idx = np.ones(batch_size, dtype=np.int)*3
+                memory = []
+                first_action_taken = False
+                
+                loss = torch.tensor(0.0, dtype=torch.float32).to(torchDevice)
+                for step in range(clip_length):
+                    clip_frame += 1
+                    frame += action_idx_to_action(action_idx)
+                    frame = frame % sequence_length
 
-                frame_input = torch.tensor(frame_input, requires_grad=True, dtype=torch.float32).to(torchDevice)
-                
-                encoded = cae.encode(frame_input)
-                output = encoded.reshape(batch_size, -1)
-                output = lgn_net(output)
-                v1_out = visual_cortex_net(output)
-                
-                reward = torch.zeros(batch_size, dtype=torch.float32).to(torchDevice)
-                
-                if clip_frame > 12:
+                    frame_input = np.zeros((batch_size, 4, config.w, config.h))
+                    for i in range(batch_size):
+                        frame_input[i] = batch_x[frame[i],i]
+
+                    frame_input = torch.tensor(frame_input, requires_grad=True, dtype=torch.float32).to(torchDevice)
+                    
+                    encoded = cae.encode(frame_input)
+                    output = encoded.reshape(batch_size, -1)
+                    output = lgn_net(output)
+                    v1_out = visual_cortex_net(output)
+                    
+                    reward = torch.zeros(batch_size, dtype=torch.float32).to(torchDevice)
+                    
                     tot_loss_class_to_pos = []
                     tot_loss_pos_to_class = []
                     tot_loss_uv_to_class = []
@@ -249,128 +243,171 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         tot_loss_neighbour_obj += [class_below_above_net.loss(y_pred_neighbour_obj_col, y_pred_neighbour_obj_shape, y_neighbour_obj_col_idx, y_neighbour_obj_shape_idx)]
 
 
+                        """
+                        print(obj_rel_pos)
+                        print(rnd_obj)
+                        print(obj_col_oh)
+                        print(obj_shape_oh)
+                        
+                        img = np.moveaxis(batch_x[frame[scenes.index(scene)], scenes.index(scene), :3, :, :], 0,2)
+                        plt.imshow(img)
+                        #plt.show()
+                        plt.draw()
+                        plt.pause(0.1)
+                        """
+                        
+                        
+                        
+
+                        s_objs = dict(scene_objects)
+                        objs = count_net.infere(v1_out)
+                        num_correct = 0
+                        num_incorrect = 0
+                        print('-------------------------')
+                        for found_obj in objs:
+                            key = found_obj[1] + '-' + found_obj[0]
+                            if key in s_objs:
+                                print("Found:", key)
+                                num_correct += 1
+                                del s_objs[key]
+                            else:
+                                num_incorrect += 1
+                                print("Failed:", key)
+
+                        for remaining_obj in s_objs:
+                            num_incorrect += 1
+                            print("Not counted:", remaining_obj)
+                        print('-------------------------')
+                        print("correctness:", num_correct/(num_correct + num_incorrect))
+                        print('-------------------------')
+
+                        success[clip_frame-1].append(num_correct/(num_correct + num_incorrect))
+
+                        p_dones, p_cols, p_shapes, p_pos = count_net(v1_out)
+                        tot_loss_countnet = count_net.loss(p_dones, p_cols, p_shapes, p_pos, scenes, frame)
+
+                        tot_loss_class_to_pos = torch.stack(tot_loss_class_to_pos)
+                        tot_loss_class_to_pos = torch.mean(tot_loss_class_to_pos,dim=0)
+
+                        tot_loss_pos_to_class = torch.stack(tot_loss_pos_to_class)
+                        tot_loss_pos_to_class = torch.mean(tot_loss_pos_to_class,dim=0)
+
+                        tot_loss_uv_to_class = torch.stack(tot_loss_uv_to_class)
+                        tot_loss_uv_to_class = torch.mean(tot_loss_uv_to_class,dim=0)
+
+                        tot_loss_class_has_below_above = torch.stack(tot_loss_class_has_below_above)
+                        tot_loss_class_has_below_above = torch.mean(tot_loss_class_has_below_above,dim=0)
+                        
+                        tot_loss_neighbour_obj = torch.stack(tot_loss_neighbour_obj)
+                        tot_loss_neighbour_obj = torch.mean(tot_loss_neighbour_obj)
+
+                        print('Episode', episode,', Clip Frame', clip_frame,'Action', action_idx, ', Loss Pos.:', torch.mean(tot_loss_class_to_pos).item(), ", Eps.", eps)
+
+                        tot_loss_sum =  tot_loss_class_to_pos + \
+                                        tot_loss_pos_to_class + \
+                                        tot_loss_uv_to_class + \
+                                        tot_loss_countnet + \
+                                        tot_loss_class_has_below_above + \
+                                        tot_loss_neighbour_obj
+
+                        
+
+                        if first_loss_initialized:
+                            current_loss = tot_loss_sum.clone().detach().float()
+                            reward += (last_loss - current_loss).detach()
+                        
+                        last_loss = tot_loss_sum.clone().detach().float()
+                        first_loss_initialized = True
+
+                        
+                        loss += torch.mean(tot_loss_sum)
+                        
+                        writer.add_scalar("Loss/Class-to-Position-Loss", torch.mean(tot_loss_class_to_pos).item(), episode)
+                        writer.add_scalar("Loss/Position-to-Class-Loss", torch.mean(tot_loss_pos_to_class).item(), episode)
+                        writer.add_scalar("Loss/UV-to-Class-Loss", torch.mean(tot_loss_uv_to_class).item(), episode)
+                        writer.add_scalar("Loss/Obj-Count-Loss", torch.mean(tot_loss_countnet).item(), episode)
+                        writer.add_scalar("Loss/Has-Below-Above-Loss", torch.mean(tot_loss_class_has_below_above).item(), episode)
+                        writer.add_scalar("Loss/Class-Below-Above-Loss", torch.mean(tot_loss_neighbour_obj).item(), episode)
+
+
+                        episode += 1
+
+                    if first_action_taken:
+                        memory.append((q_net_out, action_idx, reward))
+
+                    q_net_out = q_net(v1_out)
+                    first_action_taken = True
+
+                    if m == 0:
+                        action_idx = torch.argmax(q_net_out,dim=1).cpu().numpy()
+                        """
+                        for scene_idx in range(len(action_idx)):
+                            if 0.1 > np.random.random():
+                                action_idx[scene_idx] = randint(0, len(config.actions) - 1)
+                        """
+                    elif m == 1:
+                        action_idx = np.array([4])
+                    else:
+                        action_idx = np.array([1]) * randint(0, 6)
+
+                    print('Actions', action_idx)
+
                     """
-                    print(obj_rel_pos)
-                    print(rnd_obj)
-                    print(obj_col_oh)
-                    print(obj_shape_oh)
-                    img = np.moveaxis(batch_x[last_frame, scenes.index(scene), :3, :, :], 0,2)
-                    plt.imshow(img)
-                    plt.show()
+                    
                     """
-
-                    p_dones, p_cols, p_shapes, p_pos = count_net(v1_out)
-                    tot_loss_countnet = count_net.loss(p_dones, p_cols, p_shapes, p_pos, scenes, frame)
-
-                    tot_loss_class_to_pos = torch.stack(tot_loss_class_to_pos)
-                    tot_loss_class_to_pos = torch.mean(tot_loss_class_to_pos,dim=0)
-
-                    tot_loss_pos_to_class = torch.stack(tot_loss_pos_to_class)
-                    tot_loss_pos_to_class = torch.mean(tot_loss_pos_to_class,dim=0)
-
-                    tot_loss_uv_to_class = torch.stack(tot_loss_uv_to_class)
-                    tot_loss_uv_to_class = torch.mean(tot_loss_uv_to_class,dim=0)
-
-                    tot_loss_class_has_below_above = torch.stack(tot_loss_class_has_below_above)
-                    tot_loss_class_has_below_above = torch.mean(tot_loss_class_has_below_above,dim=0)
-					
-                    tot_loss_neighbour_obj = torch.stack(tot_loss_neighbour_obj)
-                    tot_loss_neighbour_obj = torch.mean(tot_loss_neighbour_obj)
-
-                    print('Episode', episode,', Clip Frame', clip_frame,'Action', action_idx, ', Loss Pos.:', torch.mean(tot_loss_class_to_pos).item(), ", Eps.", eps)
-
-                    tot_loss_sum =  tot_loss_class_to_pos + \
-                                    tot_loss_pos_to_class + \
-                                    tot_loss_uv_to_class + \
-                                    tot_loss_countnet + \
-                                    tot_loss_class_has_below_above + \
-                                    tot_loss_neighbour_obj
-
                     
+                eps *= eps_decay
+                eps = max([eps_min, eps])
 
-                    if first_loss_initialized:
-                        current_loss = tot_loss_sum.clone().detach().float()
-                        reward += (last_loss - current_loss).detach()
-                    
-                    last_loss = tot_loss_sum.clone().detach().float()
-                    first_loss_initialized = True
+                rl_loss = []
+                for i in range(len(memory)):
+                    mem = memory[i]
+                    q_values = mem[0]
+                    action_idx = mem[1]
+                    reward = mem[2].clone()
 
-                    
-                    loss += torch.mean(tot_loss_sum)
-                    #loss.backward(retain_graph=True)
-                    #optimizer.step()
-                    
-                    writer.add_scalar("Loss/Class-to-Position-Loss", torch.mean(tot_loss_class_to_pos).item(), episode)
-                    writer.add_scalar("Loss/Position-to-Class-Loss", torch.mean(tot_loss_pos_to_class).item(), episode)
-                    writer.add_scalar("Loss/UV-to-Class-Loss", torch.mean(tot_loss_uv_to_class).item(), episode)
-                    writer.add_scalar("Loss/Obj-Count-Loss", torch.mean(tot_loss_countnet).item(), episode)
-                    writer.add_scalar("Loss/Has-Below-Above-Loss", torch.mean(tot_loss_class_has_below_above).item(), episode)
-                    writer.add_scalar("Loss/Class-Below-Above-Loss", torch.mean(tot_loss_neighbour_obj).item(), episode)
+                    #print(q_values)
+                    discount = 0
+                    for r in range(i + 1, len(memory)):
+                        future_mem = memory[r]
+                        reward += 0.99**discount * future_mem[2]
+                        discount += 1
 
-                    del tot_loss_class_to_pos
-                    del tot_loss_pos_to_class
-                    del tot_loss_uv_to_class
-                    del tot_loss_countnet
-                    del tot_loss_class_has_below_above
-                    del tot_loss_neighbour_obj        
+                    q_loss = q_net.loss(action_idx, q_values, reward)
+                    rl_loss += [q_loss]
 
-                    del y_pred_pos, y_pred_col, y_pred_shape, y_pred_has_below_above,y_pred_neighbour_obj_col, y_pred_neighbour_obj_shape
+                rl_loss = torch.mean(torch.stack(rl_loss))
+                writer.add_scalar("Loss/Q-Net-Loss", rl_loss.item(), rl_episode)
+                rl_episode += 1
+                rl_loss = torch.clamp_max(rl_loss, 5.0)
 
-                    if episode % 500 == 0:
-                        torch.save(lgn_net.state_dict(), 'active-models/lgn-net.mdl')
-                        torch.save(visual_cortex_net.state_dict(), 'active-models/visual-cortex-net.mdl')
-                        torch.save(class_to_pos_net.state_dict(), 'active-models/posnet-model.mdl')
-                        torch.save(pos_to_class_net.state_dict(), 'active-models/colnet-model.mdl')
-                        torch.save(uv_to_class_net.state_dict(), 'active-models/uvtoclass-model.mdl')
-                        torch.save(cae.state_dict(), 'active-models/cae-model.mdl')
-                        torch.save(count_net.state_dict(), 'active-models/countnet-model.mdl')
-                        torch.save(has_below_above_net.state_dict(), 'active-models/classbelowabovenet-model.mdl')
-                        torch.save(class_below_above_net.state_dict(), 'active-models/neighbour-obj-model.mdl')
-                        torch.save(q_net.state_dict(), 'active-models/q-net-model.mdl')
-                        torch.save(optimizer.state_dict(), 'active-models/optimizer.opt')
+                loss += rl_loss
 
-                    episode += 1
+        result = np.array(success)
+        xvals = np.arange(18)
 
-                if first_action_taken:
-                    memory.append((q_net_out, action_idx, reward))
+        mean = np.mean(result, axis=1)
+        std = np.std(result, axis=1)
 
-                q_net_out = q_net(v1_out)
-                first_action_taken = True
-                action_idx = torch.argmax(q_net_out,dim=1).cpu().numpy()
+        if m == 0:
+            label = 'Greedy Action'
+        elif m == 1:
+            label = 'Static Action'
+        else:
+            label = 'Random Action'
 
-                for scene_idx in range(len(action_idx)):
-                    if eps > np.random.random():
-                        action_idx[scene_idx] = randint(0, len(config.actions) - 1)
-                
-            eps *= eps_decay
-            eps = max([eps_min, eps])
+        #plt.close()
+        plt.plot(xvals, mean, label=label)
+        #linestyle='None', marker='^',
+        (_, caps, _)  = plt.errorbar(xvals, mean, yerr=std,fmt='o',  capsize=4.0)
+        for cap in caps:
+            #cap.set_color('black')
+            cap.set_markeredgewidth(1)
+        plt.legend()
+        print(result)
 
-            rl_loss = []
-            for i in range(len(memory)):
-                mem = memory[i]
-                q_values = mem[0]
-                action_idx = mem[1]
-                reward = mem[2].clone()
-
-                print(q_values)
-                discount = 0
-                for r in range(i + 1, len(memory)):
-                    future_mem = memory[r]
-                    reward += 0.99**discount * future_mem[2]
-                    discount += 1
-
-                q_loss = q_net.loss(action_idx, q_values, reward)
-                rl_loss += [q_loss]
-
-            rl_loss = torch.mean(torch.stack(rl_loss))
-            writer.add_scalar("Loss/Q-Net-Loss", rl_loss.item(), rl_episode)
-            rl_episode += 1
-            rl_loss = torch.clamp_max(rl_loss, 5.0)
-
-            loss += rl_loss
-            loss.backward()
-            optimizer.step()
-
-
+    ax = plt.gca()
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    plt.show()
             
             

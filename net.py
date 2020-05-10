@@ -290,7 +290,8 @@ class ObjCountNet(nn.Module):
 
         out = out.reshape(1,batch_size, -1)
         done_bool = False
-        while not done_bool:
+        counter = 0
+        while not done_bool and counter < 12:
             obj_out, self.hidden = self.rnn(out, self.hidden)
             obj_out = obj_out.reshape(batch_size, -1)
             obj_out = self.lrelu(obj_out)
@@ -313,6 +314,8 @@ class ObjCountNet(nn.Module):
                 l_col.append(col)
                 l_shape.append(shape)
                 l_pos.append(pos)
+
+            counter += 1
 
         objs = []
         for tpl in zip(l_done,l_col, l_shape, l_pos):
