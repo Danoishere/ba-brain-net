@@ -468,7 +468,7 @@ class QNet(nn.Module):
             y_pred_reward_vec[scene_idx] = y_pred_reward[scene_idx, selected_action_idx[scene_idx]]
 
         return self.reward_criterion(y_pred_reward_vec, y_target_reward)
-        return self.reward_criterion(y_pred_reward_vec, y_target_reward)
+        
 
 class ClassBelowAboveNet(nn.Module):
     def __init__(self, torchDevice):
