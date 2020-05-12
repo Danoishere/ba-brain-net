@@ -112,7 +112,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
         success = [[] for i in list(range(num_frames))]
     
 
-        for i in range(10):
+        for i in range(300):
             batch_x, scenes = queue.get()
 
             for repetition in range(1):
@@ -402,5 +402,5 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     plt.savefig('plot-successrate-active-vision-enum-stream.pgf')
     plt.show()
-            
+    
             
