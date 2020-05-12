@@ -8,6 +8,7 @@ import numpy as np
 import net
 from net import Query
 import matplotlib.pyplot as plt
+import matplotlib
 from random import shuffle, randint, choice
 from autoencoder import ConvAutoencoder
 from torch.utils.tensorboard import SummaryWriter
@@ -28,6 +29,16 @@ def action_idx_to_action(indices):
     return np.array(actions,dtype=np.int)
 
 def train_video_rnn(queue, lock, torchDevice, load_model=True):
+
+    matplotlib.use("pgf")
+    matplotlib.rcParams.update({
+        "pgf.texsystem": "pdflatex",
+        'font.family': 'serif',
+        'text.usetex': True,
+        'pgf.rcfonts': False,
+    })
+
+
     now = datetime.now()
     current_time = now.strftime("-%H-%M-%S")
     writer = SummaryWriter('tensorboard/train' + current_time, flush_secs=10)
@@ -36,7 +47,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     batch_size = config.batch_size
     sequence_length = config.sequence_length
     w, h = config.w, config.h
-    num_frames = 20
+    num_frames = 14
 
     colors = config.colors
     colors_n = config.colors_n
@@ -81,9 +92,9 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     q_net.eval()
 
     class_below_above_net = net.ClassBelowAboveNet(torchDevice).to(torchDevice)
-    #class_below_above_net.load_state_dict(torch.load('active-models/neighbour-obj-model.mdl'. map_location=torchDevice)) #TODO: activate when available
+    class_below_above_net.load_state_dict(torch.load('active-models/neighbour-obj-model.mdl', map_location=torchDevice)) #TODO: activate when available
     class_below_above_net.eval()
-    for m in range(3):
+    for m in [2,1,0]:
         episode = 0
         rl_episode = 0
         num_queries = config.num_queries
@@ -101,7 +112,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
         success = [[] for i in list(range(num_frames))]
     
 
-        for i in range(15):
+        for i in range(10):
             batch_x, scenes = queue.get()
 
             for repetition in range(1):
@@ -361,7 +372,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                 eps = max([eps_min, eps])
 
         result = np.array(success)
-        xvals = np.arange(num_frames)
+        xvals = np.arange(num_frames) + 1
 
         mean = np.mean(result, axis=1)
         std = np.std(result, axis=1)
@@ -374,17 +385,22 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
             label = 'Random Action'
 
         #plt.close()
-        plt.plot(xvals, mean, label=label)
+        # plt.plot(xvals, mean, label=label)
         #linestyle='None', marker='^',
-        (_, caps, _)  = plt.errorbar(xvals, mean, yerr=std,fmt='o',  capsize=4.0)
+        (_, caps, _)  = plt.errorbar(xvals,  mean, yerr=std,  capsize=4.0)
         for cap in caps:
             #cap.set_color('black')
             cap.set_markeredgewidth(1)
         plt.legend()
         print(result)
 
+
+
     ax = plt.gca()
+    plt.xlabel('Frame')
+    plt.ylabel('Successrate of Object Enumeration Stream')
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    plt.savefig('plot-successrate-active-vision-enum-stream.pgf')
     plt.show()
             
             
