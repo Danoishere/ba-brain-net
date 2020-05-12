@@ -36,6 +36,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     batch_size = config.batch_size
     sequence_length = config.sequence_length
     w, h = config.w, config.h
+    num_frames = 20
 
     colors = config.colors
     colors_n = config.colors_n
@@ -97,15 +98,15 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
         plt.ion()
         plt.show()
         """
-        success = [[] for i in list(range(18))]
+        success = [[] for i in list(range(num_frames))]
     
 
-        for i in range(100):
+        for i in range(15):
             batch_x, scenes = queue.get()
 
             for repetition in range(1):
                 frame = np.random.randint(0, sequence_length, batch_size)
-                clip_length = 18
+                clip_length = num_frames
                 lgn_net.init_hidden(torchDevice)
                 
                 first_loss_initialized = False
@@ -359,32 +360,8 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                 eps *= eps_decay
                 eps = max([eps_min, eps])
 
-                rl_loss = []
-                for i in range(len(memory)):
-                    mem = memory[i]
-                    q_values = mem[0]
-                    action_idx = mem[1]
-                    reward = mem[2].clone()
-
-                    #print(q_values)
-                    discount = 0
-                    for r in range(i + 1, len(memory)):
-                        future_mem = memory[r]
-                        reward += 0.99**discount * future_mem[2]
-                        discount += 1
-
-                    q_loss = q_net.loss(action_idx, q_values, reward)
-                    rl_loss += [q_loss]
-
-                rl_loss = torch.mean(torch.stack(rl_loss))
-                writer.add_scalar("Loss/Q-Net-Loss", rl_loss.item(), rl_episode)
-                rl_episode += 1
-                rl_loss = torch.clamp_max(rl_loss, 5.0)
-
-                loss += rl_loss
-
         result = np.array(success)
-        xvals = np.arange(18)
+        xvals = np.arange(num_frames)
 
         mean = np.mean(result, axis=1)
         std = np.std(result, axis=1)
