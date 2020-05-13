@@ -4,7 +4,7 @@ import json
 import numpy as np
 from matplotlib.ticker import MaxNLocator
 
-"""
+
 matplotlib.use("pgf")
 matplotlib.rcParams.update({
     "pgf.texsystem": "pdflatex",
@@ -14,10 +14,10 @@ matplotlib.rcParams.update({
 })
 
 
-"""
-plt.rcParams['figure.figsize'] = (7,3.6)
+plt.style.use('seaborn')
+plt.rcParams['figure.figsize'] = (6.0,3.0)
 
-with open('eval-result.json') as f:
+with open('eval-result-longterm.json') as f:
     data = json.load(f)
 
 for key in data:
@@ -37,6 +37,6 @@ plt.ylabel('Success Rate of Object Enumeration Stream')
 ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 plt.legend()
 plt.tight_layout()
-#plt.savefig('plot-successrate-active-vision-enum-stream.pgf')
+plt.savefig('plot-successrate-active-vision-enum-stream.pgf')
 
 plt.show()
