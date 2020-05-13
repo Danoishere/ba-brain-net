@@ -30,7 +30,7 @@ def action_idx_to_action(indices):
 
 def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
-    
+    """
     matplotlib.use("pgf")
     matplotlib.rcParams.update({
         "pgf.texsystem": "pdflatex",
@@ -38,7 +38,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
         'text.usetex': True,
         'pgf.rcfonts': False,
     })
-
+    """
     
 
     plt.rcParams['figure.figsize'] = (7,3.6)
@@ -116,7 +116,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
         success = [[] for i in list(range(num_frames))]
     
 
-        for i in range(300):
+        for i in range(20):
             batch_x, scenes = queue.get()
 
             for repetition in range(1):
@@ -362,7 +362,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                                 action_idx[scene_idx] = randint(0, len(config.actions) - 1)
                         """
                     elif m == 1:
-                        action_idx = np.array([4])
+                        action_idx = np.array([5])
                     else:
                         action_idx = np.array([1]) * randint(0, 6)
 
@@ -403,10 +403,11 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
     ax = plt.gca()
     plt.xlabel('Frame')
-    plt.ylabel('Successrate of Object Enumeration Stream')
+    plt.ylabel('Success Rate of Object Enumeration Stream')
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     plt.legend()
-    plt.savefig('plot-successrate-active-vision-enum-stream.pgf')
+    plt.tight_layout()
+    #plt.savefig('plot-successrate-active-vision-enum-stream.pgf')
     plt.show()
     
             
