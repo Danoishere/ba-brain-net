@@ -30,6 +30,7 @@ def action_idx_to_action(indices):
 
 def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
+    
     matplotlib.use("pgf")
     matplotlib.rcParams.update({
         "pgf.texsystem": "pdflatex",
@@ -38,6 +39,9 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
         'pgf.rcfonts': False,
     })
 
+    
+
+    plt.rcParams['figure.figsize'] = (7,3.6)
 
     now = datetime.now()
     current_time = now.strftime("-%H-%M-%S")
@@ -94,7 +98,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     class_below_above_net = net.ClassBelowAboveNet(torchDevice).to(torchDevice)
     class_below_above_net.load_state_dict(torch.load('active-models/neighbour-obj-model.mdl', map_location=torchDevice)) #TODO: activate when available
     class_below_above_net.eval()
-    for m in [2,1,0]:
+    for m in [0,1,2]:
         episode = 0
         rl_episode = 0
         num_queries = config.num_queries
@@ -378,20 +382,21 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
         std = np.std(result, axis=1)
 
         if m == 0:
-            label = 'Greedy Action'
+            label = 'Greedy Actions'
         elif m == 1:
-            label = 'Static Action'
+            label = 'Static Actions'
         else:
-            label = 'Random Action'
+            label = 'Random Actions'
 
         #plt.close()
         # plt.plot(xvals, mean, label=label)
         #linestyle='None', marker='^',
-        (_, caps, _)  = plt.errorbar(xvals,  mean, yerr=std,  capsize=4.0)
-        for cap in caps:
-            #cap.set_color('black')
-            cap.set_markeredgewidth(1)
-        plt.legend()
+        #(_, caps, _)  = 
+        plt.plot(xvals,  mean, label=label) #, yerr=std,  capsize=4.0, label=label)
+        #for cap in caps:
+        #    #cap.set_color('black')
+        #    cap.set_markeredgewidth(1)
+        #plt.legend()
         print(result)
 
 
@@ -400,6 +405,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     plt.xlabel('Frame')
     plt.ylabel('Successrate of Object Enumeration Stream')
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    plt.legend()
     plt.savefig('plot-successrate-active-vision-enum-stream.pgf')
     plt.show()
     
