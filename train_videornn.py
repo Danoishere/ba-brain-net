@@ -30,6 +30,7 @@ def action_idx_to_action(indices):
 
 def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
+    eval = {}
     """
     matplotlib.use("pgf")
     matplotlib.rcParams.update({
@@ -375,6 +376,8 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                 eps *= eps_decay
                 eps = max([eps_min, eps])
 
+        
+
         result = np.array(success)
         xvals = np.arange(num_frames) + 1
 
@@ -383,10 +386,19 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
         if m == 0:
             label = 'Greedy Actions'
+            key ='greedy'
         elif m == 1:
             label = 'Static Actions'
+            key='static'
         else:
             label = 'Random Actions'
+            key ='random'
+
+        eval[key] = {}
+        eval[key]['label'] = label
+        eval[key]['data'] = success
+
+
 
         #plt.close()
         # plt.plot(xvals, mean, label=label)
@@ -408,6 +420,11 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     plt.legend()
     plt.tight_layout()
     #plt.savefig('plot-successrate-active-vision-enum-stream.pgf')
+    
+
+    with open('eval-result.json', 'w') as f:
+        json.dump(eval, f)
+
     plt.show()
     
             
