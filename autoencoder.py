@@ -9,10 +9,10 @@ class ConvAutoencoder(nn.Module):
         super(ConvAutoencoder, self).__init__()
 
         self.pre = nn.Sequential( # like the Composition layer you built
-            nn.Conv2d(4, 256, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(4, 128, kernel_size=3, stride=1, padding=1),
             nn.MaxPool2d(2),
             nn.ReLU(),
-            nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1),
             nn.MaxPool2d(2),
             nn.ReLU()
         )
@@ -20,10 +20,10 @@ class ConvAutoencoder(nn.Module):
         self.clstm = ConvLSTM(
                 torchDevice,
                 input_size=(32, 32),
-                 input_dim=256,
-                 hidden_dim=[512, 512, 512],
+                 input_dim=128,
+                 hidden_dim=[256, 512],
                  kernel_size=(3, 3),
-                 num_layers=3,
+                 num_layers=2,
                  batch_first=False,
                  bias=True,
                  return_all_layers=False)
@@ -34,10 +34,10 @@ class ConvAutoencoder(nn.Module):
         )
 
         self.post = nn.Sequential( # like the Composition layer you built
-            nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(512, 256, kernel_size=3, stride=1, padding=1),
             nn.MaxPool2d(2),
             nn.ReLU(),
-            nn.Conv2d(512, 256, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
             nn.MaxPool2d(2),
             nn.ReLU(),
             nn.Conv2d(256, 128, kernel_size=3, stride=1, padding=1),
