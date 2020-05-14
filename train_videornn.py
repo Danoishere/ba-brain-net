@@ -96,7 +96,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
     eps = 1.0
     eps_min = 0.01
-    eps_decay = 0.9999
+    eps_decay = 0.999
     
     while True:
         batch_x, scenes = queue.get()
@@ -279,7 +279,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                                 tot_loss_class_has_below_above + \
                                 tot_loss_neighbour_obj
 
-                
 
                 if first_loss_initialized:
                     current_loss = tot_loss_sum.clone().detach().float()
@@ -288,7 +287,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                 last_loss = tot_loss_sum.clone().detach().float()
                 first_loss_initialized = True
 
-                
                 loss += torch.mean(tot_loss_sum)
                 #loss.backward(retain_graph=True)
                 #optimizer.step()
@@ -345,7 +343,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                 reward = mem[2].clone()
 
                 print(q_values)
-                discount = 0
+                discount = 1
                 for r in range(i + 1, len(memory)):
                     future_mem = memory[r]
                     reward += 0.99**discount * future_mem[2]
