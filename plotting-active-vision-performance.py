@@ -14,10 +14,11 @@ matplotlib.rcParams.update({
 })
 
 
-plt.style.use('seaborn')
-plt.rcParams['figure.figsize'] = (6.0,3.0)
 
-with open('eval-result-longterm.json') as f:
+plt.style.use('seaborn')
+plt.rcParams['figure.figsize'] = (6.0,3.5)
+
+with open('eval-result-longterm-static-all-500.json') as f:
     data = json.load(f)
 
 for key in data:
