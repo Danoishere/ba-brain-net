@@ -117,7 +117,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
         success = [[] for i in list(range(num_frames))]
     
 
-        for i in range(100):
+        for i in range(500):
             batch_x, scenes = queue.get()
 
             for repetition in range(1):
