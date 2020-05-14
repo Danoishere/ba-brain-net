@@ -99,7 +99,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     class_below_above_net = net.ClassBelowAboveNet(torchDevice).to(torchDevice)
     class_below_above_net.load_state_dict(torch.load('active-models/neighbour-obj-model.mdl', map_location=torchDevice)) #TODO: activate when available
     class_below_above_net.eval()
-    for m in [0,1,2]:
+    for m in [0,1,2,3,4]:
         episode = 0
         rl_episode = 0
         num_queries = config.num_queries
@@ -117,7 +117,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
         success = [[] for i in list(range(num_frames))]
     
 
-        for i in range(20):
+        for i in range(100):
             batch_x, scenes = queue.get()
 
             for repetition in range(1):
@@ -357,13 +357,12 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
                     if m == 0:
                         action_idx = torch.argmax(q_net_out,dim=1).cpu().numpy()
-                        """
-                        for scene_idx in range(len(action_idx)):
-                            if 0.1 > np.random.random():
-                                action_idx[scene_idx] = randint(0, len(config.actions) - 1)
-                        """
                     elif m == 1:
+                        action_idx = np.array([4])
+                    elif m == 2:
                         action_idx = np.array([5])
+                    elif m == 3:
+                        action_idx = np.array([6])
                     else:
                         action_idx = np.array([1]) * randint(0, 6)
 
@@ -388,8 +387,14 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
             label = 'Greedy Actions'
             key ='greedy'
         elif m == 1:
-            label = 'Static Actions'
-            key='static'
+            label = 'Static +1 Action'
+            key='static1'
+        elif m == 2:
+            label = 'Static +2 Action'
+            key='static2'
+        elif m == 3:
+            label = 'Static +5 Action'
+            key='static5'
         else:
             label = 'Random Actions'
             key ='random'
@@ -422,7 +427,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     #plt.savefig('plot-successrate-active-vision-enum-stream.pgf')
     
 
-    with open('eval-result.json', 'w') as f:
+    with open('eval-result-shortterm-static-all-100.json', 'w') as f:
         json.dump(eval, f)
 
     plt.show()
