@@ -73,7 +73,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     q_net.train()
 
     class_below_above_net = net.ClassBelowAboveNet(torchDevice).to(torchDevice)
-    #class_below_above_net.load_state_dict(torch.load('active-models/neighbour-obj-model.mdl'. map_location=torchDevice)) #TODO: activate when available
+    class_below_above_net.load_state_dict(torch.load('active-models/neighbour-obj-model.mdl', map_location=torchDevice)) #TODO: activate when available
     class_below_above_net.train()
 
     params = []
