@@ -41,7 +41,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     belowAbove = config.belowAbove
 
     cae = ConvAutoencoder().to(torchDevice)
-    cae.load_state_dict(torch.load('active-models/cae-model.mdl', map_location=torchDevice))
+    #cae.load_state_dict(torch.load('active-models/cae-model.mdl', map_location=torchDevice))
     cae.train()
 
     visual_cortex_net = net.VisualCortexNet().to(torchDevice)
@@ -102,7 +102,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
             action_idx = np.ones(batch_size, dtype=np.int)*3
             memory = []
             
-            loss = torch.tensor(0.0, dtype=torch.float32).to(torchDevice)
+            
             for step in range(clip_length):
                 clip_frame += 1
                 frame += action_idx_to_action(action_idx)
@@ -126,6 +126,8 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                 tot_loss_countnet = []
                 tot_loss_class_has_below_above = []
                 tot_loss_neighbour_obj = []
+
+                loss = torch.tensor(0.0, dtype=torch.float32).to(torchDevice)
 
                 # Sample 10 different objects combinations from each training batch.
                 for i in range(num_queries):
@@ -269,6 +271,8 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
 
                 loss += torch.mean(tot_loss_sum)
+                loss.backward()
+                optimizer.step()
                 
                 writer.add_scalar("Loss/Class-to-Position-Loss", torch.mean(tot_loss_class_to_pos).item(), episode)
                 writer.add_scalar("Loss/Position-to-Class-Loss", torch.mean(tot_loss_pos_to_class).item(), episode)
@@ -293,8 +297,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
                 
 
-            loss.backward()
-            optimizer.step()
+            
 
 
             
