@@ -114,7 +114,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
         batch_x, scenes = queue.get()
 
         frame = np.random.randint(0, sequence_length, batch_size)
-        clip_length = 9
+        clip_length = 15
         optimizer.zero_grad()
         lgn_net.init_hidden(torchDevice)
         
@@ -143,7 +143,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
             
             
             # Sample 10 different objects combinations from each training batch.
-            if clip_frame == 8:
+            if clip_frame == 14:
                 # Predict color, based on location
                 y_target_rel_pos = []
                 y_target_has_below_above = []
