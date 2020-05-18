@@ -3,7 +3,6 @@ import os
 import random
 from multiprocessing import Process, Queue, Lock
 from fileutils import load_batch
-from train_autoencoder import train_autoencoder
 from train_videornn import train_video_rnn
 import argparse
 import torch
