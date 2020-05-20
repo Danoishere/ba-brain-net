@@ -40,13 +40,9 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     shapes_n = config.shapes_n
     belowAbove = config.belowAbove
 
-    cae = ConvAutoencoder().to(torchDevice)
-    cae.load_state_dict(torch.load('active-models/cae-model.mdl', map_location=torchDevice))
+    cae = ConvAutoencoder(torchDevice).to(torchDevice)
+    #cae.load_state_dict(torch.load('active-models/cae-model.mdl', map_location=torchDevice))
     cae.train()
-
-    lgn_net = net.VisionNet().to(torchDevice)
-    lgn_net.load_state_dict(torch.load('active-models/lgn-net.mdl', map_location=torchDevice))
-    lgn_net.train()
 
     visual_cortex_net = net.VisualCortexNet().to(torchDevice)
     visual_cortex_net.load_state_dict(torch.load('active-models/visual-cortex-net.mdl', map_location=torchDevice))
@@ -82,7 +78,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
     params = []
     params += list(cae.parameters())
-    params += list(lgn_net.parameters())
     params += list(visual_cortex_net.parameters())
     params += list(class_to_pos_net.parameters())
     params += list(pos_to_class_net.parameters())
@@ -110,7 +105,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
             frame = np.random.randint(0, sequence_length, batch_size)
             clip_length = 9
             optimizer.zero_grad()
-            lgn_net.init_hidden(torchDevice)
+            cae.reset_hidden_state()
             
             first_loss_initialized = False
             clip_frame = 0
@@ -130,9 +125,8 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
                 frame_input = torch.tensor(frame_input, requires_grad=True, dtype=torch.float32).to(torchDevice)
                 
-                encoded = cae.encode(frame_input)
+                encoded = cae(frame_input)
                 output = encoded.reshape(batch_size, -1)
-                output = lgn_net(output)
                 v1_out = visual_cortex_net(output)
                 
                 reward = torch.zeros(batch_size, dtype=torch.float32).to(torchDevice)
@@ -302,7 +296,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                 writer.add_scalar("Loss/Class-Below-Above-Loss", torch.mean(tot_loss_neighbour_obj).item(), episode)
 
                 if episode % 500 == 0:
-                    torch.save(lgn_net.state_dict(), 'active-models/lgn-net.mdl')
                     torch.save(visual_cortex_net.state_dict(), 'active-models/visual-cortex-net.mdl')
                     torch.save(class_to_pos_net.state_dict(), 'active-models/posnet-model.mdl')
                     torch.save(pos_to_class_net.state_dict(), 'active-models/colnet-model.mdl')

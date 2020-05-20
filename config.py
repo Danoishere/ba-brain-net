@@ -2,7 +2,7 @@
 lr=0.00001 #local
 #lr=0.00001
 
-batch_size = 14 #local
+batch_size = 4 #local
 #batch_size = 32
 sequence_length = 36
 w,h = 128, 128
