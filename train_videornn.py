@@ -64,10 +64,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     cae.load_state_dict(torch.load('active-models/cae-model.mdl', map_location=torchDevice))
     cae.eval()
 
-    lgn_net = net.VisionNet().to(torchDevice)
-    lgn_net.load_state_dict(torch.load('active-models/lgn-net.mdl', map_location=torchDevice))
-    lgn_net.eval()
-
     visual_cortex_net = net.VisualCortexNet().to(torchDevice)
     visual_cortex_net.load_state_dict(torch.load('active-models/visual-cortex-net.mdl', map_location=torchDevice))
     visual_cortex_net.eval()
@@ -99,7 +95,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     class_below_above_net = net.ClassBelowAboveNet(torchDevice).to(torchDevice)
     class_below_above_net.load_state_dict(torch.load('active-models/neighbour-obj-model.mdl', map_location=torchDevice)) #TODO: activate when available
     class_below_above_net.eval()
-    for m in [0]:
+    for m in [2]:
         episode = 0
         rl_episode = 0
         num_queries = config.num_queries
@@ -129,8 +125,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
             for repetition in range(1):
                 frame = np.random.randint(0, sequence_length, batch_size)
                 clip_length = num_frames
-                lgn_net.init_hidden(torchDevice)
-                
+
                 first_loss_initialized = False
                 clip_frame = 0
                 action_idx = np.ones(batch_size, dtype=np.int)*3
@@ -151,7 +146,6 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     
                     encoded = cae.encode(frame_input)
                     output = encoded.reshape(batch_size, -1)
-                    output = lgn_net(output)
                     v1_out = visual_cortex_net(output)
                     
                     reward = torch.zeros(batch_size, dtype=torch.float32).to(torchDevice)
