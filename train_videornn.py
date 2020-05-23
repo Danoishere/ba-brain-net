@@ -339,10 +339,10 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                 reward = mem[2].clone()
 
                 print(q_values)
-                discount = 0
+                discount = 1
                 for r in range(i + 1, len(memory)):
                     future_mem = memory[r]
-                    reward += 0.7**discount * future_mem[2]
+                    reward += 0.99**discount * future_mem[2]
                     discount += 1
 
                 q_loss = q_net.loss(action_idx, q_values, reward)
