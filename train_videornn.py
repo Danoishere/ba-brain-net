@@ -99,7 +99,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     num_queries = config.num_queries
     skip = config.skip_factor
 
-    eps = 0.5
+    eps = 1.0
     eps_min = 0.01
     eps_decay = 0.9999
     
