@@ -41,43 +41,43 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     belowAbove = config.belowAbove
 
     cae = ConvAutoencoder().to(torchDevice)
-    cae.load_state_dict(torch.load('active-models/cae-model.mdl', map_location=torchDevice))
+    #cae.load_state_dict(torch.load('active-models/cae-model.mdl', map_location=torchDevice))
     cae.train()
 
     lgn_net = net.VisionNet().to(torchDevice)
-    lgn_net.load_state_dict(torch.load('active-models/lgn-net.mdl', map_location=torchDevice))
+    #lgn_net.load_state_dict(torch.load('active-models/lgn-net.mdl', map_location=torchDevice))
     lgn_net.train()
 
     visual_cortex_net = net.VisualCortexNet().to(torchDevice)
-    visual_cortex_net.load_state_dict(torch.load('active-models/visual-cortex-net.mdl', map_location=torchDevice))
+    #visual_cortex_net.load_state_dict(torch.load('active-models/visual-cortex-net.mdl', map_location=torchDevice))
     visual_cortex_net.train()
 
     class_to_pos_net = net.ClassToPosNet().to(torchDevice)
-    class_to_pos_net.load_state_dict(torch.load('active-models/posnet-model.mdl', map_location=torchDevice))
+    #class_to_pos_net.load_state_dict(torch.load('active-models/posnet-model.mdl', map_location=torchDevice))
     class_to_pos_net.train()
 
     pos_to_class_net = net.PosToClass(torchDevice).to(torchDevice)
-    pos_to_class_net.load_state_dict(torch.load('active-models/colnet-model.mdl', map_location=torchDevice))
+    #pos_to_class_net.load_state_dict(torch.load('active-models/colnet-model.mdl', map_location=torchDevice))
     pos_to_class_net.train()
 
     uv_to_class_net = net.UVToClass(torchDevice).to(torchDevice)
-    uv_to_class_net.load_state_dict(torch.load('active-models/uvtoclass-model.mdl', map_location=torchDevice))
+    #uv_to_class_net.load_state_dict(torch.load('active-models/uvtoclass-model.mdl', map_location=torchDevice))
     uv_to_class_net.train()
 
     count_net = net.ObjCountNet(torchDevice).to(torchDevice)
-    count_net.load_state_dict(torch.load('active-models/countnet-model.mdl', map_location=torchDevice))
+    #count_net.load_state_dict(torch.load('active-models/countnet-model.mdl', map_location=torchDevice))
     count_net.train()
 
     has_below_above_net = net.HasObjectBelowAboveNet(torchDevice).to(torchDevice)
-    has_below_above_net.load_state_dict(torch.load('active-models/classbelowabovenet-model.mdl', map_location=torchDevice))
+    #has_below_above_net.load_state_dict(torch.load('active-models/classbelowabovenet-model.mdl', map_location=torchDevice))
     has_below_above_net.train()
 
     q_net = net.QNet(torchDevice).to(torchDevice)
-    q_net.load_state_dict(torch.load('active-models/q-net-model.mdl', map_location=torchDevice))
+    #q_net.load_state_dict(torch.load('active-models/q-net-model.mdl', map_location=torchDevice))
     q_net.train()
 
     class_below_above_net = net.ClassBelowAboveNet(torchDevice).to(torchDevice)
-    class_below_above_net.load_state_dict(torch.load('active-models/neighbour-obj-model.mdl', map_location=torchDevice)) #TODO: activate when available
+    #class_below_above_net.load_state_dict(torch.load('active-models/neighbour-obj-model.mdl', map_location=torchDevice)) #TODO: activate when available
     class_below_above_net.train()
 
     params = []
@@ -99,7 +99,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     num_queries = config.num_queries
     skip = config.skip_factor
 
-    eps = 0.5
+    eps = 1.0
     eps_min = 0.01
     eps_decay = 0.9999
     

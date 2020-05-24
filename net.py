@@ -342,7 +342,7 @@ class ObjCountNet(nn.Module):
         pred_pos = torch.stack(l_pos)
         loss_batch = []
         for s in range(len(scenes)):
-            loss_pos = [] #torch.tensor(0.0).to(self.torchDevice)
+            loss_pos = [] 
             loss_col = []
             loss_shape = []
             # 1 = found more, 0 = all objects outputted
@@ -357,19 +357,28 @@ class ObjCountNet(nn.Module):
             for scene_obj in scene_objs:
                 scene_obj_pos = scene_cam_mat @ np.array(scene_obj[1]['pos'] + [1.0])
                 scene_pos.append(scene_obj_pos[:3])
-            scene_pos = np.asarray(scene_pos)
 
+            scene_pos = np.asarray(scene_pos)
             pred_scene_pos_t = pred_pos[:len(scene_pos), s, :]
             pred_scene_pos_n = pred_scene_pos_t.clone().cpu().detach().numpy()
 
-            cost_matrix = cdist(pred_scene_pos_n, scene_pos)
-            _, assignment = linear_sum_assignment(cost_matrix)
-
             # REMEMBER: Use updated relative position!!!!!!!
+            num_scene_objs = len(scene_objs)
 
-            for i in range(len(scene_objs)):
-                closest_obj = scene_objs[assignment[i]]
-                closest_pos = scene_pos[assignment[i]]
+            for i in range(num_scene_objs):
+                pred_obj_pos = pred_scene_pos_n[i]
+                closest_dist = 1000
+                closest_idx = -1
+                for o in range(len(scene_pos)):
+                    obj_pos = scene_pos[o]
+                    dist = np.linalg.norm(pred_obj_pos - obj_pos)
+                    if dist < closest_dist:
+                        closest_dist = dist
+                        closest_obj = scene_objs[o]
+                        closest_pos = scene_pos[o]
+                        closest_idx = o
+                
+                scene_pos = np.delete(scene_pos, closest_idx, 0)
 
                 obj_pos = torch.tensor(closest_pos).to(self.torchDevice)
                 obj_col_idx = torch.tensor([config.colors.index(closest_obj[1]['color-name'])], dtype=torch.long).to(self.torchDevice)
