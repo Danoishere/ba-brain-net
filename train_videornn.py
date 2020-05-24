@@ -60,13 +60,9 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     shapes_n = config.shapes_n
     belowAbove = config.belowAbove
 
-    cae = ConvAutoencoder().to(torchDevice)
+    cae = ConvAutoencoder(torchDevice).to(torchDevice)
     cae.load_state_dict(torch.load('active-models/cae-model.mdl', map_location=torchDevice))
     cae.eval()
-
-    lgn_net = net.VisionNet().to(torchDevice)
-    lgn_net.load_state_dict(torch.load('active-models/lgn-net.mdl', map_location=torchDevice))
-    lgn_net.eval()
 
     visual_cortex_net = net.VisualCortexNet().to(torchDevice)
     visual_cortex_net.load_state_dict(torch.load('active-models/visual-cortex-net.mdl', map_location=torchDevice))
@@ -123,7 +119,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
         tot_acc_class_has_below_above = 0
         tot_loss_neighbour_obj = 0
 
-        for i in range(1000):
+        for i in range(100):
             batch_x, scenes = queue.get()
 
             for repetition in range(1):
