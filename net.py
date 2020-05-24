@@ -439,6 +439,31 @@ class HasObjectBelowAboveNet(nn.Module):
 
 
 
+# (vent_in, dors_in, shape, col) -> hasAboveBelowNet
+class ContainsRedObject(nn.Module):
+    def __init__(self, torchDevice):
+        super(ContainsRedObject, self).__init__()
+        self.lrelu = nn.LeakyReLU()
+        self.fc1 = nn.Linear(2048, 1024)
+        self.fc2 = nn.Linear(1024, 256)
+        self.fc3 = nn.Linear(256, 1)
+        self.has_red_obj = nn.BCEWithLogitsLoss(reduction='none').to(torchDevice)
+
+
+    def forward(self, v1_in):
+        out = self.fc1(v1_in)
+        out = self.lrelu(out)
+        out = self.fc2(out)
+        out = self.lrelu(out)
+        out = self.fc3(out)
+        return out
+
+
+    def loss(self, y_pred_has_red, y_target_has_red):
+        return self.has_red_obj(y_pred_has_red.squeeze(1), y_target_has_red)
+
+
+
 class QNet(nn.Module):
     def __init__(self, torchDevice):
         super(QNet, self).__init__()
