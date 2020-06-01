@@ -12,16 +12,16 @@ class ConvAutoencoder(nn.Module):
             nn.ReLU(),
             nn.Conv2d(128, 256, kernel_size=5, stride=2, padding=1),
             nn.ReLU(),
-            nn.Conv2d(256, 256, kernel_size=5, stride=2, padding=1),
+            nn.Conv2d(256, 512, kernel_size=5, stride=2, padding=1),
             nn.ReLU(),
-            nn.Conv2d(256, 778, kernel_size=5, stride=2, padding=1),
+            nn.Conv2d(512, 2048, kernel_size=5, stride=2, padding=1),
         )
 
-        self.clstm = ConvLSTMCell(torchDevice, 778, 778).to(torchDevice)
+        self.clstm = ConvLSTMCell(torchDevice, 2048, 2048).to(torchDevice)
 
         self.post_encoder = nn.Sequential( # like the Composition layer you built
             nn.ReLU(),
-            nn.Conv2d(778, 128, kernel_size=3)
+            nn.Conv2d(2048, 128, kernel_size=3)
         )
 
     def reset_hidden_state(self):
