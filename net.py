@@ -251,28 +251,28 @@ class ObjCountNet(nn.Module):
         l_pos = []
 
         out = out.reshape(1,batch_size, -1)
-        for i in range(10):
-            obj_out, self.hidden = self.rnn(out, self.hidden)
-            obj_out = obj_out.reshape(batch_size, -1)
-            obj_out = self.lrelu(obj_out)
-            obj_out = self.fc2(obj_out)
-            obj_out = self.lrelu(obj_out)
-            obj_out = self.fc3(obj_out)
-            obj_out = self.lrelu(obj_out)
-            obj_out = self.fc4(obj_out)
-            obj_out = self.lrelu(obj_out)
+        #for i in range(10):
+        obj_out, self.hidden = self.rnn(out, self.hidden)
+        obj_out = obj_out.reshape(batch_size, -1)
+        obj_out = self.lrelu(obj_out)
+        obj_out = self.fc2(obj_out)
+        obj_out = self.lrelu(obj_out)
+        obj_out = self.fc3(obj_out)
+        obj_out = self.lrelu(obj_out)
+        obj_out = self.fc4(obj_out)
+        obj_out = self.lrelu(obj_out)
 
-            done = self.binary_done(obj_out)
-            col = self.logits_col(obj_out)
-            shape = self.logits_shape(obj_out)
-            pos = self.obj_pos(obj_out)
+        done = self.binary_done(obj_out)
+        col = self.logits_col(obj_out)
+        shape = self.logits_shape(obj_out)
+        pos = self.obj_pos(obj_out)
 
-            l_done.append(done)
-            l_col.append(col)
-            l_shape.append(shape)
-            l_pos.append(pos)
+        l_done.append(done)
+        l_col.append(col)
+        l_shape.append(shape)
+        l_pos.append(pos)
 
-        return l_done, l_col, l_shape, l_pos
+        return done, col, shape, pos # l_done, l_col, l_shape, l_pos
 
 
     def infere(self, v1_in):

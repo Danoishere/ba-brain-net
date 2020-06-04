@@ -49,46 +49,80 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     cae.eval()
     cae.reset_hidden_state()
 
-    input_tensor = torch.zeros([1, 4, 128, 128], requires_grad=True)
-    output_tensor = cae(input_tensor)
+    input_scene_embedding = torch.zeros([1, 4, 128, 128], requires_grad=True)
+    output_tensor = cae(input_scene_embedding)
+
+    img = make_dot(output_tensor, params=dict(list(cae.named_parameters())+ [('input_frame', input_scene_embedding)]))
+    img.render('convLSTM-plot')
+
+
+    input_scene_embedding = torch.zeros([1, 2048], requires_grad=True)
+
+    def plot_stream(name, model, scene_embedding, additional_input_tuples):
+
+        input_list = []
+        for i in additional_input_tuples:
+            input_list.append(i[1])
+
+        inp = [scene_embedding] + input_list
+        output_tensor = model(*inp)
+        img = make_dot(output_tensor, params=dict(list(model.named_parameters()) + [('scene_embedding', scene_embedding)] + additional_input_tuples))
+        img.render(name)
 
     visual_cortex_net = net.VisualCortexNet().to(torchDevice)
     #visual_cortex_net.load_state_dict(torch.load('active-models/visual-cortex-net.mdl', map_location=torchDevice))
     visual_cortex_net.eval()
 
-    output_tensor =  output_tensor.reshape(1, -1)
-    output_tensor = visual_cortex_net(output_tensor)
-
-    convlstm_img = make_dot(output_tensor, params=dict(list(cae.named_parameters()) + list(visual_cortex_net.named_parameters()) + [('input_frame', input_tensor)]))
-    convlstm_img.render('ConvLSTM-plot')
+    plot_stream('fc-scene-embedding-plot', visual_cortex_net, input_scene_embedding, [])
 
     class_to_pos_net = net.ClassToPosNet().to(torchDevice)
-    class_to_pos_net.load_state_dict(torch.load('active-models/posnet-model.mdl', map_location=torchDevice))
-    class_to_pos_net.train()
+    #class_to_pos_net.load_state_dict(torch.load('active-models/posnet-model.mdl', map_location=torchDevice))
+    class_to_pos_net.eval()
+
+    onehot_col = torch.zeros([1, 7], requires_grad=True)
+    onehot_shape = torch.zeros([1, 5], requires_grad=True)
+
+    plot_stream('class-to-pos-plot', class_to_pos_net, input_scene_embedding, [('color', onehot_col), ('shape', onehot_shape)])
 
     pos_to_class_net = net.PosToClass(torchDevice).to(torchDevice)
-    pos_to_class_net.load_state_dict(torch.load('active-models/colnet-model.mdl', map_location=torchDevice))
-    pos_to_class_net.train()
+    #pos_to_class_net.load_state_dict(torch.load('active-models/colnet-model.mdl', map_location=torchDevice))
+    pos_to_class_net.eval()
+
+    pos =  torch.zeros([1, 3], requires_grad=True)
+
+    plot_stream('pos-to-class-plot', pos_to_class_net, input_scene_embedding, [('position', pos)])
 
     uv_to_class_net = net.UVToClass(torchDevice).to(torchDevice)
-    uv_to_class_net.load_state_dict(torch.load('active-models/uvtoclass-model.mdl', map_location=torchDevice))
-    uv_to_class_net.train()
+    #uv_to_class_net.load_state_dict(torch.load('active-models/uvtoclass-model.mdl', map_location=torchDevice))
+    uv_to_class_net.eval()
+
+    uv =  torch.zeros([1, 2], requires_grad=True)
+
+    plot_stream('uv-to-class-plot', uv_to_class_net, input_scene_embedding, [('uv-coordinates', uv)])
 
     count_net = net.ObjCountNet(torchDevice).to(torchDevice)
-    count_net.load_state_dict(torch.load('active-models/countnet-model.mdl', map_location=torchDevice))
-    count_net.train()
+    #count_net.load_state_dict(torch.load('active-models/countnet-model.mdl', map_location=torchDevice))
+    count_net.eval()
+
+    plot_stream('enumerating-plot', count_net, input_scene_embedding, [])
 
     has_below_above_net = net.HasObjectBelowAboveNet(torchDevice).to(torchDevice)
-    has_below_above_net.load_state_dict(torch.load('active-models/classbelowabovenet-model.mdl', map_location=torchDevice))
-    has_below_above_net.train()
+    #has_below_above_net.load_state_dict(torch.load('active-models/classbelowabovenet-model.mdl', map_location=torchDevice))
+    has_below_above_net.eval()
+
+    plot_stream('has-above-below-plot', has_below_above_net, input_scene_embedding, [('color', onehot_col), ('shape', onehot_shape)])
 
     q_net = net.QNet(torchDevice).to(torchDevice)
-    q_net.load_state_dict(torch.load('active-models/q-net-model.mdl', map_location=torchDevice))
-    q_net.train()
+    #q_net.load_state_dict(torch.load('active-models/q-net-model.mdl', map_location=torchDevice))
+    q_net.eval()
+
+    plot_stream('qnet-plot', q_net, input_scene_embedding, [])
 
     class_below_above_net = net.ClassBelowAboveNet(torchDevice).to(torchDevice)
-    class_below_above_net.load_state_dict(torch.load('active-models/neighbour-obj-model.mdl', map_location=torchDevice)) #TODO: activate when available
-    class_below_above_net.train()
+    #class_below_above_net.load_state_dict(torch.load('active-models/neighbour-obj-model.mdl', map_location=torchDevice)) #TODO: activate when available
+    class_below_above_net.eval()
+
+    plot_stream('class-above-below-plot', class_below_above_net, input_scene_embedding, [('color', onehot_col), ('shape', onehot_shape)])
 
     params = []
     params += list(cae.parameters())
