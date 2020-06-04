@@ -14,6 +14,10 @@ from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 import config
 
+import hiddenlayer as hl
+import graphviz
+from torchviz import make_dot, make_dot_from_trace
+
 import gc
 import sys
 
@@ -42,11 +46,21 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
     cae = ConvAutoencoder(torchDevice).to(torchDevice)
     #cae.load_state_dict(torch.load('active-models/cae-model.mdl', map_location=torchDevice))
-    cae.train()
+    cae.eval()
+    cae.reset_hidden_state()
+
+    input_tensor = torch.zeros([1, 4, 128, 128], requires_grad=True)
+    output_tensor = cae(input_tensor)
 
     visual_cortex_net = net.VisualCortexNet().to(torchDevice)
-    visual_cortex_net.load_state_dict(torch.load('active-models/visual-cortex-net.mdl', map_location=torchDevice))
-    visual_cortex_net.train()
+    #visual_cortex_net.load_state_dict(torch.load('active-models/visual-cortex-net.mdl', map_location=torchDevice))
+    visual_cortex_net.eval()
+
+    output_tensor =  output_tensor.reshape(1, -1)
+    output_tensor = visual_cortex_net(output_tensor)
+
+    convlstm_img = make_dot(output_tensor, params=dict(list(cae.named_parameters()) + list(visual_cortex_net.named_parameters()) + [('input_frame', input_tensor)]))
+    convlstm_img.render('ConvLSTM-plot')
 
     class_to_pos_net = net.ClassToPosNet().to(torchDevice)
     class_to_pos_net.load_state_dict(torch.load('active-models/posnet-model.mdl', map_location=torchDevice))
