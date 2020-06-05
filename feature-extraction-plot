@@ -1,0 +1,104 @@
+digraph {
+	graph [ratio=compress size="7.75,10.25"]
+	node [align=left fontsize=12 height=0.2 ranksep=0.1 shape=box style=filled]
+	2581246286472 [label=SigmoidBackward fillcolor=darkolivegreen1]
+	2581246285064 -> 2581246286472
+	2581246285064 [label=SlowConvTranspose2DBackward]
+	2581246285704 -> 2581246285064
+	2581246285704 [label=ReluBackward0]
+	2581215028232 -> 2581246285704
+	2581215028232 [label=SlowConvTranspose2DBackward]
+	2581246285128 -> 2581215028232
+	2581246285128 [label=ReluBackward0]
+	2581246283912 -> 2581246285128
+	2581246283912 [label=SlowConvTranspose2DBackward]
+	2581246284744 -> 2581246283912
+	2581246284744 [label=ReluBackward0]
+	2581246285512 -> 2581246284744
+	2581246285512 [label=SlowConvTranspose2DBackward]
+	2581246286280 -> 2581246285512
+	2581246286280 [label=ReluBackward0]
+	2581246286600 -> 2581246286280
+	2581246286600 [label=SlowConvTranspose2DBackward]
+	2581246286792 -> 2581246286600
+	2581246286792 [label=ThnnConv2DBackward]
+	2581246287176 -> 2581246286792
+	2581246287176 [label=ReluBackward0]
+	2581246287368 -> 2581246287176
+	2581246287368 [label=ThnnConv2DBackward]
+	2581246287624 -> 2581246287368
+	2581246287624 [label=ReluBackward0]
+	2581246288072 -> 2581246287624
+	2581246288072 [label=ThnnConv2DBackward]
+	2581246288264 -> 2581246288072
+	2581246288264 [label=ReluBackward0]
+	2581246288648 -> 2581246288264
+	2581246288648 [label=ThnnConv2DBackward]
+	2581246288840 -> 2581246288648
+	2581246288840 [label=ReluBackward0]
+	2581246289224 -> 2581246288840
+	2581246289224 [label=ThnnConv2DBackward]
+	2581246289416 -> 2581246289224
+	2581246289416 [label="frame
+ (1, 4, 128, 128)" fillcolor=lightblue]
+	2581246289352 -> 2581246289224
+	2581246289352 [label="encoder.0.weight
+ (128, 4, 7, 7)" fillcolor=lightblue]
+	2581246289608 -> 2581246289224
+	2581246289608 [label="encoder.0.bias
+ (128)" fillcolor=lightblue]
+	2581246288776 -> 2581246288648
+	2581246288776 [label="encoder.2.weight
+ (128, 128, 5, 5)" fillcolor=lightblue]
+	2581246289032 -> 2581246288648
+	2581246289032 [label="encoder.2.bias
+ (128)" fillcolor=lightblue]
+	2581246288200 -> 2581246288072
+	2581246288200 [label="encoder.4.weight
+ (128, 128, 5, 5)" fillcolor=lightblue]
+	2581246288456 -> 2581246288072
+	2581246288456 [label="encoder.4.bias
+ (128)" fillcolor=lightblue]
+	2581246287560 -> 2581246287368
+	2581246287560 [label="encoder.6.weight
+ (128, 128, 5, 5)" fillcolor=lightblue]
+	2581246287816 -> 2581246287368
+	2581246287816 [label="encoder.6.bias
+ (128)" fillcolor=lightblue]
+	2581246284168 -> 2581246286792
+	2581246284168 [label="encoder.8.weight
+ (128, 128, 3, 3)" fillcolor=lightblue]
+	2581246285256 -> 2581246286792
+	2581246285256 [label="encoder.8.bias
+ (128)" fillcolor=lightblue]
+	2581246286984 -> 2581246286600
+	2581246286984 [label="decoder.0.weight
+ (128, 128, 3, 3)" fillcolor=lightblue]
+	2581246287240 -> 2581246286600
+	2581246287240 [label="decoder.0.bias
+ (128)" fillcolor=lightblue]
+	2581246286024 -> 2581246285512
+	2581246286024 [label="decoder.2.weight
+ (128, 256, 3, 3)" fillcolor=lightblue]
+	2581246286408 -> 2581246285512
+	2581246286408 [label="decoder.2.bias
+ (256)" fillcolor=lightblue]
+	2581246284488 -> 2581246283912
+	2581246284488 [label="decoder.4.weight
+ (256, 256, 3, 3)" fillcolor=lightblue]
+	2581246285640 -> 2581246283912
+	2581246285640 [label="decoder.4.bias
+ (256)" fillcolor=lightblue]
+	2581246284360 -> 2581215028232
+	2581246284360 [label="decoder.6.weight
+ (256, 256, 3, 3)" fillcolor=lightblue]
+	2581246283976 -> 2581215028232
+	2581246283976 [label="decoder.6.bias
+ (256)" fillcolor=lightblue]
+	2581246284104 -> 2581246285064
+	2581246284104 [label="decoder.8.weight
+ (256, 4, 3, 3)" fillcolor=lightblue]
+	2581246286088 -> 2581246285064
+	2581246286088 [label="decoder.8.bias
+ (4)" fillcolor=lightblue]
+}

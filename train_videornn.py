@@ -14,6 +14,10 @@ from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 import config
 
+import hiddenlayer as hl
+import graphviz
+from torchviz import make_dot, make_dot_from_trace
+
 import gc
 import sys
 
@@ -40,45 +44,70 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     shapes_n = config.shapes_n
     belowAbove = config.belowAbove
 
+    def plot_stream(name, model, scene_embedding, input_name, additional_input_tuples):
+        input_list = []
+        for i in additional_input_tuples:
+            input_list.append(i[1])
+
+        inp = [scene_embedding] + input_list
+        output_tensor = model(*inp)
+        img = make_dot(output_tensor, params=dict(list(model.named_parameters()) + [(input_name, scene_embedding)] + additional_input_tuples))
+        
+        img.graph_attr.update(size = "7.75,10.25") #['size'] = '12,8'
+        img.graph_attr.update(ratio = "compress")
+        img.render(name)
+
+    input_frame = torch.zeros([1, 4, 128, 128], requires_grad=True)
+    
+
+    input_feature_extracted = torch.zeros([1, 2048], requires_grad=True)
+
     cae = ConvAutoencoder().to(torchDevice)
-    cae.load_state_dict(torch.load('active-models/cae-model.mdl', map_location=torchDevice))
-    cae.train()
+    #cae.load_state_dict(torch.load('active-models/cae-model.mdl', map_location=torchDevice))
+    cae.eval()
+
+    plot_stream('feature-extraction-plot', cae, input_frame, 'frame', [])
+
+    
 
     lgn_net = net.VisionNet().to(torchDevice)
-    lgn_net.load_state_dict(torch.load('active-models/lgn-net.mdl', map_location=torchDevice))
-    lgn_net.train()
+    #lgn_net.load_state_dict(torch.load('active-models/lgn-net.mdl', map_location=torchDevice))
+    lgn_net.eval()
+    lgn_net.init_hidden(torchDevice)
+
+    plot_stream('recurrent-net-plot', lgn_net, input_feature_extracted, 'vector_with_extracted_features', [])
 
     visual_cortex_net = net.VisualCortexNet().to(torchDevice)
     visual_cortex_net.load_state_dict(torch.load('active-models/visual-cortex-net.mdl', map_location=torchDevice))
-    visual_cortex_net.train()
+    visual_cortex_net.eval()
 
     class_to_pos_net = net.ClassToPosNet().to(torchDevice)
     class_to_pos_net.load_state_dict(torch.load('active-models/posnet-model.mdl', map_location=torchDevice))
-    class_to_pos_net.train()
+    class_to_pos_net.eval()
 
     pos_to_class_net = net.PosToClass(torchDevice).to(torchDevice)
     pos_to_class_net.load_state_dict(torch.load('active-models/colnet-model.mdl', map_location=torchDevice))
-    pos_to_class_net.train()
+    pos_to_class_net.eval()
 
     uv_to_class_net = net.UVToClass(torchDevice).to(torchDevice)
     uv_to_class_net.load_state_dict(torch.load('active-models/uvtoclass-model.mdl', map_location=torchDevice))
-    uv_to_class_net.train()
+    uv_to_class_net.eval()
 
     count_net = net.ObjCountNet(torchDevice).to(torchDevice)
     count_net.load_state_dict(torch.load('active-models/countnet-model.mdl', map_location=torchDevice))
-    count_net.train()
+    count_net.eval()
 
     has_below_above_net = net.HasObjectBelowAboveNet(torchDevice).to(torchDevice)
     has_below_above_net.load_state_dict(torch.load('active-models/classbelowabovenet-model.mdl', map_location=torchDevice))
-    has_below_above_net.train()
+    has_below_above_net.eval()
 
     q_net = net.QNet(torchDevice).to(torchDevice)
     q_net.load_state_dict(torch.load('active-models/q-net-model.mdl', map_location=torchDevice))
-    q_net.train()
+    q_net.eval()
 
     class_below_above_net = net.ClassBelowAboveNet(torchDevice).to(torchDevice)
     class_below_above_net.load_state_dict(torch.load('active-models/neighbour-obj-model.mdl', map_location=torchDevice)) #TODO: activate when available
-    class_below_above_net.train()
+    class_below_above_net.eval()
 
     params = []
     params += list(cae.parameters())
