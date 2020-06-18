@@ -1,4 +1,4 @@
-# Active Scene Understanding From Image Sequences for Next-Generation Computer Vision 
+# Active Scene Understanding from Image Sequences for Next-Generation Computer Vision 
 Bachelor thesis by Ralph Meier & Dano Roost.
 Check out the following branches:
 
