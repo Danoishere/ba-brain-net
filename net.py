@@ -95,10 +95,10 @@ class UVToClass(nn.Module):
         out = self.lrelu(out)
         
         ripe = self.binary_ripe(out)
-        return ripe
+        return ripe.squeeze(1)
 
     def loss(self, pred_ripe_logits, target_ripe_idx):
-        ripe_loss = self.binary_ripe(pred_ripe_logits, target_ripe_idx)
+        ripe_loss = self.ripe_criterion(pred_ripe_logits, target_ripe_idx)
         return ripe_loss
 
 
@@ -266,7 +266,7 @@ class ObjCountNet(nn.Module):
                 if "ripe" in closest_obj[0]:
                     ripe_val = 1.0
                 
-                obj_ripe = torch.tensor([ripe_val], dtype=torch.long).to(self.torchDevice)
+                obj_ripe = torch.tensor([ripe_val], dtype=torch.float).to(self.torchDevice)
                 obj_has_more = torch.tensor([1.0], dtype=torch.float).to(self.torchDevice)
 
                 loss_pos += [self.dist_loss(l_pos[i][s], obj_pos)]
@@ -327,6 +327,7 @@ class PosIsRipeClass(nn.Module):
         self.fc2 = nn.Linear(1024, 1024)
         self.fc3 = nn.Linear(1024, 512)
         self.fc4 = nn.Linear(512, 64)
+        self.fc5 = nn.Linear(64, 1)
 
         self.ripe_criterion = nn.BCEWithLogitsLoss().to(torchDevice)
 
@@ -340,8 +341,9 @@ class PosIsRipeClass(nn.Module):
         out = self.lrelu(out)
         out = self.fc4(out)
         out = self.lrelu(out)
+        out = self.fc5(out)
 
-        return out
+        return out.squeeze(1)
 
 
     def loss(self, pred_isRipe, target_isRipe):

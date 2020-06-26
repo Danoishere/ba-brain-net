@@ -190,26 +190,14 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                 tot_loss_is_ripe = torch.stack(tot_loss_is_ripe)
                 tot_loss_is_ripe = torch.mean(tot_loss_is_ripe,dim=0)
 
-                tot_loss_pos_to_class = torch.stack(tot_loss_pos_to_class)
-                tot_loss_pos_to_class = torch.mean(tot_loss_pos_to_class,dim=0)
-
                 tot_loss_uv_to_class = torch.stack(tot_loss_uv_to_class)
                 tot_loss_uv_to_class = torch.mean(tot_loss_uv_to_class,dim=0)
-
-                tot_loss_class_has_below_above = torch.stack(tot_loss_class_has_below_above)
-                tot_loss_class_has_below_above = torch.mean(tot_loss_class_has_below_above,dim=0)
-                
-                tot_loss_neighbour_obj = torch.stack(tot_loss_neighbour_obj)
-                tot_loss_neighbour_obj = torch.mean(tot_loss_neighbour_obj)
 
                 print('Episode', episode,', Clip Frame', clip_frame,'Action', action_idx, ', Loss Pos.:', torch.mean(tot_loss_is_ripe).item(), ", Eps.", eps)
 
                 tot_loss_sum =  tot_loss_is_ripe + \
-                                tot_loss_pos_to_class + \
                                 tot_loss_uv_to_class + \
-                                tot_loss_countnet + \
-                                tot_loss_class_has_below_above + \
-                                tot_loss_neighbour_obj
+                                tot_loss_countnet
 
 
                 if first_loss_initialized:
@@ -222,11 +210,8 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                 loss += torch.mean(tot_loss_sum)
                 
                 writer.add_scalar("Loss/Class-to-Position-Loss", torch.mean(tot_loss_is_ripe).item(), episode)
-                writer.add_scalar("Loss/Position-to-Class-Loss", torch.mean(tot_loss_pos_to_class).item(), episode)
                 writer.add_scalar("Loss/UV-to-Class-Loss", torch.mean(tot_loss_uv_to_class).item(), episode)
                 writer.add_scalar("Loss/Obj-Count-Loss", torch.mean(tot_loss_countnet).item(), episode)
-                writer.add_scalar("Loss/Has-Below-Above-Loss", torch.mean(tot_loss_class_has_below_above).item(), episode)
-                writer.add_scalar("Loss/Class-Below-Above-Loss", torch.mean(tot_loss_neighbour_obj).item(), episode)
 
                 if episode % 500 == 0:
                     torch.save(lgn_net.state_dict(), 'active-models/lgn-net.mdl')
@@ -235,7 +220,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     torch.save(cae.state_dict(), 'active-models/cae-model.mdl')
                     torch.save(count_net.state_dict(), 'active-models/countnet-model.mdl')
                     torch.save(q_net.state_dict(), 'active-models/q-net-model.mdl')
-                    torch.save(pos_is_ripe_net.state_dict(), 'activate-models/pos_is_ripe_model.mdl')
+                    torch.save(pos_is_ripe_net.state_dict(), 'active-models/pos_is_ripe_model.mdl')
                     torch.save(optimizer.state_dict(), 'active-models/optimizer.opt')
                     
 

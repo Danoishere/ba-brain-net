@@ -77,6 +77,10 @@ def load_batch():
             frame_input = reshape_frame(rgb, depth)
             batch_x[frame, batch_idx, :,:,:] = frame_input
 
+        objs = scene_data['objects']
+        for obj_name in objs:
+            objs[obj_name]['is_ripe'] = 'ripe' in obj_name
+
         if is_reversed:
             scene_data["cam_base_matricies"].reverse()
             scene_data["ss_objs"].reverse()
