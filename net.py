@@ -519,3 +519,38 @@ class ClassBelowAboveNet(nn.Module):
         shape_loss = self.shape_criterion(pred_shape_logits, target_shape_idx)
         total_loss = col_loss + shape_loss
         return total_loss
+
+#Input: Position
+#Output: is_Ripe
+class PosIsRipe(nn.Module):
+    def __init__(self, torchDevice):
+        super(PosIsRipe, self).__init__()
+        self.lrelu = nn.LeakyReLU()
+        self.fc1 = nn.Linear(2048 + 3, 1024)
+        self.fc2 = nn.Linear(1024, 1024)
+        self.fc3 = nn.Linear(1024, 512)
+        self.fc4 = nn.Linear(512, 64)
+
+        self.sigmoid_is_ripe = nn.Sigmoid()
+        
+        self.ripe_criterion = nn.L1Loss().to(torchDevice)
+
+
+    def forward(self, v1_in, pos):
+        out = torch.cat((v1_in, pos), 1)
+        out = self.fc1(out)
+        out = self.lrelu(out)
+        out = self.fc2(out)
+        out = self.lrelu(out)
+        out = self.fc3(out)
+        out = self.lrelu(out)
+        out = self.fc4(out)
+        out = self.lrelu(out)
+
+        isRipe = self.sigmoid_is_ripe(out)
+        return isRipe
+
+
+    def loss(self, pred_isRipe, target_isRipe):
+        ripe_loss = self.ripe_criterion(pred_isRipe, target_isRipe)
+        return ripe_loss
