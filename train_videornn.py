@@ -52,33 +52,17 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     visual_cortex_net.load_state_dict(torch.load('active-models/visual-cortex-net.mdl', map_location=torchDevice))
     visual_cortex_net.train()
 
-    class_to_pos_net = net.ClassToPosNet().to(torchDevice)
-    class_to_pos_net.load_state_dict(torch.load('active-models/posnet-model.mdl', map_location=torchDevice))
-    class_to_pos_net.train()
-
-    pos_to_class_net = net.PosToClass(torchDevice).to(torchDevice)
-    pos_to_class_net.load_state_dict(torch.load('active-models/colnet-model.mdl', map_location=torchDevice))
-    pos_to_class_net.train()
-
     uv_to_class_net = net.UVToClass(torchDevice).to(torchDevice)
-    uv_to_class_net.load_state_dict(torch.load('active-models/uvtoclass-model.mdl', map_location=torchDevice))
+    #uv_to_class_net.load_state_dict(torch.load('active-models/uvtoclass-model.mdl', map_location=torchDevice))
     uv_to_class_net.train()
 
     count_net = net.ObjCountNet(torchDevice).to(torchDevice)
-    count_net.load_state_dict(torch.load('active-models/countnet-model.mdl', map_location=torchDevice))
+    #count_net.load_state_dict(torch.load('active-models/countnet-model.mdl', map_location=torchDevice))
     count_net.train()
-
-    has_below_above_net = net.HasObjectBelowAboveNet(torchDevice).to(torchDevice)
-    has_below_above_net.load_state_dict(torch.load('active-models/classbelowabovenet-model.mdl', map_location=torchDevice))
-    has_below_above_net.train()
 
     q_net = net.QNet(torchDevice).to(torchDevice)
     q_net.load_state_dict(torch.load('active-models/q-net-model.mdl', map_location=torchDevice))
     q_net.train()
-
-    class_below_above_net = net.ClassBelowAboveNet(torchDevice).to(torchDevice)
-    class_below_above_net.load_state_dict(torch.load('active-models/neighbour-obj-model.mdl', map_location=torchDevice))
-    class_below_above_net.train()
 
     pos_is_ripe_net = net.PosIsRipeClass(torchDevice).to(torchDevice)
     # pos_is_ripe_net-load_state_dict(torch.load('active-models/pos_is_ripe_model.mdl', map_location=torchDevice))
@@ -88,13 +72,9 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     params += list(cae.parameters())
     params += list(lgn_net.parameters())
     params += list(visual_cortex_net.parameters())
-    params += list(class_to_pos_net.parameters())
-    params += list(pos_to_class_net.parameters())
     params += list(uv_to_class_net.parameters())
     params += list(count_net.parameters())
-    params += list(has_below_above_net.parameters())
     params += list(q_net.parameters())
-    params += list(class_below_above_net.parameters())
     params += list(pos_is_ripe_net())
 
     optimizer = torch.optim.RMSprop(params, lr=lr) #.Adam(params, lr=lr)
@@ -142,12 +122,9 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                 
                 reward = torch.zeros(batch_size, dtype=torch.float32).to(torchDevice)
                 
-                tot_loss_class_to_pos = []
-                tot_loss_pos_to_class = []
+                tot_loss_is_ripe = []
                 tot_loss_uv_to_class = []
                 tot_loss_countnet = []
-                tot_loss_class_has_below_above = []
-                tot_loss_neighbour_obj = []
 
                 # Sample 10 different objects combinations from each training batch.
                 for i in range(num_queries):
@@ -156,13 +133,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     y_target_has_below_above = []
                     
                     all_uvs = []
-                    obj_col_onehots = []
-                    obj_col_indices = []
-                    obj_shape_indices = []
-                    obj_shape_onehots = []
-                    below_above_indices = []
-                    neighbour_obj_col_indices = []
-                    neighbour_obj_shape_indices = []
+                    obj_ripe = []
                     all_objs = []
                     all_cam_pos = []
 
@@ -181,86 +152,27 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         obj_rel_pos = last_frame_transf_mat_inv @ np.array(obj_pos + [1])
                         obj_rel_pos = obj_rel_pos[:3]
 
-                        obj_col_idx = colors.index(scene_objects[rnd_obj]['color-name'])
-                        obj_shape_idx = shapes.index(rnd_obj.split("-")[0])
-
-                        obj_has_above = 'is_below' in scene_objects[rnd_obj].keys() #is below -> has above
-                        obj_has_below = 'is_above' in scene_objects[rnd_obj].keys() #is above -> has below
-
-                        neighbour_obj = ''
-                        if obj_has_below:
-                            below_above_idx = belowAbove.index("below")
-                            neighbour_obj = scene_objects[rnd_obj]['is_above']
-                        elif obj_has_above:
-                            below_above_idx = belowAbove.index("above")
-                            neighbour_obj = scene_objects[rnd_obj]['is_below']
-                        else:
-                            below_above_idx = belowAbove.index("standalone")
-                            neighbour_obj = "None-none" #no neighbour obj
-
-                        neighbour_obj_shape = neighbour_obj.split("-")[0]
-                        neighbour_obj_color = neighbour_obj.split("-")[1]
-                        neighbour_obj_shape_idx = shapes_n.index(neighbour_obj_shape)
-                        neighbour_obj_col_idx = colors_n.index(neighbour_obj_color)
-
-                        obj_col_oh = np.zeros(len(colors))
-                        obj_col_oh[obj_col_idx] = 1.0
-                        obj_shape_oh = np.zeros(len(shapes))
-                        obj_shape_oh[obj_shape_idx] = 1.0
-
                         is_ripe_bool = scene_objects[rnd_obj]['is_ripe'] #change that
-                        
+                        binary_ripe = 0.0
+                        if is_ripe_bool:
+                            binary_ripe = 1.0
 
                         #y_target_pos.append(obj_pos)
                         y_target_rel_pos.append(obj_rel_pos)
-                        obj_col_onehots.append(obj_col_oh)
-                        obj_shape_onehots.append(obj_shape_oh)
-                        obj_col_indices.append(obj_col_idx)
-                        obj_shape_indices.append(obj_shape_idx)
-                        below_above_indices.append(below_above_idx)
-                        neighbour_obj_shape_indices.append(neighbour_obj_shape_idx)
-                        neighbour_obj_col_indices.append(neighbour_obj_col_idx)
+                        obj_ripe.append(binary_ripe)
 
                     # oh = one-hot
-                    y_col_oh = torch.tensor(obj_col_onehots, requires_grad=True, dtype=torch.float32).to(torchDevice)
-                    y_shape_oh = torch.tensor(obj_shape_onehots, requires_grad=True, dtype=torch.float32).to(torchDevice)
+                    y_ripe_bin = torch.tensor(obj_ripe, requires_grad=True, dtype=torch.float32).to(torchDevice)
                     y_uvs = torch.tensor(all_uvs, requires_grad=True, dtype=torch.float32).to(torchDevice)
                     y_target_rel_pos_t = torch.tensor(y_target_rel_pos, requires_grad=True, dtype=torch.float32).to(torchDevice)
 
-                    y_col_idx = torch.tensor(obj_col_indices, dtype=torch.long).to(torchDevice)
-                    y_shape_idx = torch.tensor(obj_shape_indices, dtype=torch.long).to(torchDevice)
-                    
-                    y_has_below_above_idx = torch.tensor(below_above_indices, dtype=torch.long).to(torchDevice)
-                    y_neighbour_obj_shape_idx = torch.tensor(neighbour_obj_shape_indices, dtype=torch.long).to(torchDevice)
-                    y_neighbour_obj_col_idx = torch.tensor(neighbour_obj_col_indices, dtype=torch.long).to(torchDevice)
-
-                    y_pos_is_ripe_idx = 
-
-                    # Find position loss
-                    y_pred_pos = class_to_pos_net(v1_out, y_col_oh, y_shape_oh)
-                    tot_loss_class_to_pos += [class_to_pos_net.loss(y_pred_pos, y_target_rel_pos_t)]
-
-                    # Find class loss
-                    y_pred_col, y_pred_shape = pos_to_class_net(v1_out, y_target_rel_pos_t)
-                    tot_loss_pos_to_class += [pos_to_class_net.loss(y_pred_col,y_pred_shape, y_col_idx, y_shape_idx)]
-
                     # UV to class loss
-                    y_pred_col, y_pred_shape = uv_to_class_net(v1_out, y_uvs)
-                    tot_loss_uv_to_class += [uv_to_class_net.loss(y_pred_col,y_pred_shape, y_col_idx, y_shape_idx)]
-
-                    # Find hasAbove loss
-                    y_pred_has_below_above = has_below_above_net(v1_out, y_col_oh, y_shape_oh)
-                    tot_loss_class_has_below_above += [has_below_above_net.loss(y_pred_has_below_above,y_has_below_above_idx)]
-
-                    # Find class below above loss
-                    y_pred_neighbour_obj_col, y_pred_neighbour_obj_shape = class_below_above_net(v1_out,y_col_oh, y_shape_oh)
-                    tot_loss_neighbour_obj += [class_below_above_net.loss(y_pred_neighbour_obj_col, y_pred_neighbour_obj_shape, y_neighbour_obj_col_idx, y_neighbour_obj_shape_idx)]
-
+                    y_pred_ripe = uv_to_class_net(v1_out, y_uvs)
+                    tot_loss_uv_to_class += [uv_to_class_net.loss(y_pred_ripe, y_ripe_bin)]
 
                     # Find class is ripe loss
                     y_pred_pos_is_ripe = pos_is_ripe_net(v1_out, y_target_rel_pos_t)
-                    tot_loss_pos_is_ripe += [pos_is_ripe_net.loss(y_pred_pos_is_ripe, y_pos_is_ripe_idx)]
-                    #TODO
+                    tot_loss_is_ripe += [pos_is_ripe_net.loss(y_pred_pos_is_ripe, y_ripe_bin)]
 
                 """
                 print(obj_rel_pos)
@@ -272,11 +184,11 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                 plt.show()
                 """
 
-                p_dones, p_cols, p_shapes, p_pos = count_net(v1_out)
-                tot_loss_countnet = count_net.loss(p_dones, p_cols, p_shapes, p_pos, scenes, frame)
+                p_dones, p_ripe, p_pos = count_net(v1_out)
+                tot_loss_countnet = count_net.loss(p_dones, p_ripe, p_pos, scenes, frame)
 
-                tot_loss_class_to_pos = torch.stack(tot_loss_class_to_pos)
-                tot_loss_class_to_pos = torch.mean(tot_loss_class_to_pos,dim=0)
+                tot_loss_is_ripe = torch.stack(tot_loss_is_ripe)
+                tot_loss_is_ripe = torch.mean(tot_loss_is_ripe,dim=0)
 
                 tot_loss_pos_to_class = torch.stack(tot_loss_pos_to_class)
                 tot_loss_pos_to_class = torch.mean(tot_loss_pos_to_class,dim=0)
@@ -290,9 +202,9 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                 tot_loss_neighbour_obj = torch.stack(tot_loss_neighbour_obj)
                 tot_loss_neighbour_obj = torch.mean(tot_loss_neighbour_obj)
 
-                print('Episode', episode,', Clip Frame', clip_frame,'Action', action_idx, ', Loss Pos.:', torch.mean(tot_loss_class_to_pos).item(), ", Eps.", eps)
+                print('Episode', episode,', Clip Frame', clip_frame,'Action', action_idx, ', Loss Pos.:', torch.mean(tot_loss_is_ripe).item(), ", Eps.", eps)
 
-                tot_loss_sum =  tot_loss_class_to_pos + \
+                tot_loss_sum =  tot_loss_is_ripe + \
                                 tot_loss_pos_to_class + \
                                 tot_loss_uv_to_class + \
                                 tot_loss_countnet + \
@@ -309,7 +221,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
 
                 loss += torch.mean(tot_loss_sum)
                 
-                writer.add_scalar("Loss/Class-to-Position-Loss", torch.mean(tot_loss_class_to_pos).item(), episode)
+                writer.add_scalar("Loss/Class-to-Position-Loss", torch.mean(tot_loss_is_ripe).item(), episode)
                 writer.add_scalar("Loss/Position-to-Class-Loss", torch.mean(tot_loss_pos_to_class).item(), episode)
                 writer.add_scalar("Loss/UV-to-Class-Loss", torch.mean(tot_loss_uv_to_class).item(), episode)
                 writer.add_scalar("Loss/Obj-Count-Loss", torch.mean(tot_loss_countnet).item(), episode)
@@ -319,13 +231,9 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                 if episode % 500 == 0:
                     torch.save(lgn_net.state_dict(), 'active-models/lgn-net.mdl')
                     torch.save(visual_cortex_net.state_dict(), 'active-models/visual-cortex-net.mdl')
-                    torch.save(class_to_pos_net.state_dict(), 'active-models/posnet-model.mdl')
-                    torch.save(pos_to_class_net.state_dict(), 'active-models/colnet-model.mdl')
                     torch.save(uv_to_class_net.state_dict(), 'active-models/uvtoclass-model.mdl')
                     torch.save(cae.state_dict(), 'active-models/cae-model.mdl')
                     torch.save(count_net.state_dict(), 'active-models/countnet-model.mdl')
-                    torch.save(has_below_above_net.state_dict(), 'active-models/classbelowabovenet-model.mdl')
-                    torch.save(class_below_above_net.state_dict(), 'active-models/neighbour-obj-model.mdl')
                     torch.save(q_net.state_dict(), 'active-models/q-net-model.mdl')
                     torch.save(pos_is_ripe_net.state_dict(), 'activate-models/pos_is_ripe_model.mdl')
                     torch.save(optimizer.state_dict(), 'active-models/optimizer.opt')
