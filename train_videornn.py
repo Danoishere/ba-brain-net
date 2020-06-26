@@ -41,15 +41,15 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     belowAbove = config.belowAbove
 
     cae = ConvAutoencoder().to(torchDevice)
-    cae.load_state_dict(torch.load('active-models/cae-model.mdl', map_location=torchDevice))
+    #cae.load_state_dict(torch.load('active-models/cae-model.mdl', map_location=torchDevice))
     cae.train()
 
     lgn_net = net.VisionNet().to(torchDevice)
-    lgn_net.load_state_dict(torch.load('active-models/lgn-net.mdl', map_location=torchDevice))
+    #lgn_net.load_state_dict(torch.load('active-models/lgn-net.mdl', map_location=torchDevice))
     lgn_net.train()
 
     visual_cortex_net = net.VisualCortexNet().to(torchDevice)
-    visual_cortex_net.load_state_dict(torch.load('active-models/visual-cortex-net.mdl', map_location=torchDevice))
+    #visual_cortex_net.load_state_dict(torch.load('active-models/visual-cortex-net.mdl', map_location=torchDevice))
     visual_cortex_net.train()
 
     uv_to_class_net = net.UVToClass(torchDevice).to(torchDevice)
@@ -61,7 +61,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     count_net.train()
 
     q_net = net.QNet(torchDevice).to(torchDevice)
-    q_net.load_state_dict(torch.load('active-models/q-net-model.mdl', map_location=torchDevice))
+    #q_net.load_state_dict(torch.load('active-models/q-net-model.mdl', map_location=torchDevice))
     q_net.train()
 
     pos_is_ripe_net = net.PosIsRipeClass(torchDevice).to(torchDevice)
@@ -75,7 +75,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     params += list(uv_to_class_net.parameters())
     params += list(count_net.parameters())
     params += list(q_net.parameters())
-    params += list(pos_is_ripe_net())
+    params += list(pos_is_ripe_net.parameters())
 
     optimizer = torch.optim.RMSprop(params, lr=lr) #.Adam(params, lr=lr)
 
