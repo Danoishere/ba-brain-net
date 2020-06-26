@@ -77,8 +77,12 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     q_net.train()
 
     class_below_above_net = net.ClassBelowAboveNet(torchDevice).to(torchDevice)
-    class_below_above_net.load_state_dict(torch.load('active-models/neighbour-obj-model.mdl', map_location=torchDevice)) #TODO: activate when available
+    class_below_above_net.load_state_dict(torch.load('active-models/neighbour-obj-model.mdl', map_location=torchDevice))
     class_below_above_net.train()
+
+    pos_is_ripe_net = net.PosIsRipeClass(torchDevice).to(torchDevice)
+    # pos_is_ripe_net-load_state_dict(torch.load('active-models/pos_is_ripe_model.mdl', map_location=torchDevice))
+    pos_is_ripe_net.train()
 
     params = []
     params += list(cae.parameters())
@@ -91,6 +95,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     params += list(has_below_above_net.parameters())
     params += list(q_net.parameters())
     params += list(class_below_above_net.parameters())
+    params += list(pos_is_ripe_net())
 
     optimizer = torch.optim.RMSprop(params, lr=lr) #.Adam(params, lr=lr)
 
@@ -203,6 +208,9 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                         obj_shape_oh = np.zeros(len(shapes))
                         obj_shape_oh[obj_shape_idx] = 1.0
 
+                        is_ripe_bool = scene_objects[rnd_obj]['is_ripe'] #change that
+                        
+
                         #y_target_pos.append(obj_pos)
                         y_target_rel_pos.append(obj_rel_pos)
                         obj_col_onehots.append(obj_col_oh)
@@ -226,6 +234,8 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     y_neighbour_obj_shape_idx = torch.tensor(neighbour_obj_shape_indices, dtype=torch.long).to(torchDevice)
                     y_neighbour_obj_col_idx = torch.tensor(neighbour_obj_col_indices, dtype=torch.long).to(torchDevice)
 
+                    y_pos_is_ripe_idx = 
+
                     # Find position loss
                     y_pred_pos = class_to_pos_net(v1_out, y_col_oh, y_shape_oh)
                     tot_loss_class_to_pos += [class_to_pos_net.loss(y_pred_pos, y_target_rel_pos_t)]
@@ -246,6 +256,11 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     y_pred_neighbour_obj_col, y_pred_neighbour_obj_shape = class_below_above_net(v1_out,y_col_oh, y_shape_oh)
                     tot_loss_neighbour_obj += [class_below_above_net.loss(y_pred_neighbour_obj_col, y_pred_neighbour_obj_shape, y_neighbour_obj_col_idx, y_neighbour_obj_shape_idx)]
 
+
+                    # Find class is ripe loss
+                    y_pred_pos_is_ripe = pos_is_ripe_net(v1_out, y_target_rel_pos_t)
+                    tot_loss_pos_is_ripe += [pos_is_ripe_net.loss(y_pred_pos_is_ripe, y_pos_is_ripe_idx)]
+                    #TODO
 
                 """
                 print(obj_rel_pos)
@@ -312,7 +327,9 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     torch.save(has_below_above_net.state_dict(), 'active-models/classbelowabovenet-model.mdl')
                     torch.save(class_below_above_net.state_dict(), 'active-models/neighbour-obj-model.mdl')
                     torch.save(q_net.state_dict(), 'active-models/q-net-model.mdl')
+                    torch.save(pos_is_ripe_net.state_dict(), 'activate-models/pos_is_ripe_model.mdl')
                     torch.save(optimizer.state_dict(), 'active-models/optimizer.opt')
+                    
 
                 episode += 1
 

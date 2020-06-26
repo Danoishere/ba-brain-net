@@ -522,9 +522,9 @@ class ClassBelowAboveNet(nn.Module):
 
 #Input: Position
 #Output: is_Ripe
-class PosIsRipe(nn.Module):
+class PosIsRipeClass(nn.Module):
     def __init__(self, torchDevice):
-        super(PosIsRipe, self).__init__()
+        super(PosIsRipeClass, self).__init__()
         self.lrelu = nn.LeakyReLU()
         self.fc1 = nn.Linear(2048 + 3, 1024)
         self.fc2 = nn.Linear(1024, 1024)
