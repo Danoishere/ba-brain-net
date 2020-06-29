@@ -16,7 +16,6 @@ from datetime import datetime
 import config
 from matplotlib.ticker import MaxNLocator
 import gc
-import psutil
 import sys
 
 plt.style.use('seaborn')
@@ -52,7 +51,7 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
     batch_size = config.batch_size
     sequence_length = config.sequence_length
     w, h = config.w, config.h
-    num_frames = 18
+    num_frames = 6
 
     colors = config.colors
     colors_n = config.colors_n
@@ -123,11 +122,11 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
         tot_acc_class_has_below_above = 0
         tot_loss_neighbour_obj = 0
 
-        for i in range(1000):
+        for i in range(1):
             batch_x, scenes = queue.get()
 
             for repetition in range(1):
-                frame = np.random.randint(0, sequence_length, batch_size)
+                frame = np.zeros(1, dtype=np.int)
                 clip_length = num_frames
                 lgn_net.init_hidden(torchDevice)
                 
@@ -142,6 +141,8 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     clip_frame += 1
                     frame += action_idx_to_action(action_idx)
                     frame = frame % sequence_length
+
+                    print(frame)
 
                     frame_input = np.zeros((batch_size, 4, config.w, config.h))
                     for i in range(batch_size):
@@ -238,15 +239,23 @@ def train_video_rnn(queue, lock, torchDevice, load_model=True):
                     y_neighbour_obj_shape_idx = torch.tensor(neighbour_obj_shape_indices, dtype=torch.long).to(torchDevice)
                     y_neighbour_obj_col_idx = torch.tensor(neighbour_obj_col_indices, dtype=torch.long).to(torchDevice)
 
-                    if clip_frame == 17:
+                    np.set_printoptions(suppress=True)
+                    if clip_frame == 5:
                         # Find position loss
                         s_objs = dict(scene_objects)
                         objs = count_net.infere(v1_out)
+
+                        last_frame_transf_mat = np.array(scene["cam_base_matricies"][frame[scene_idx]])
+
                         num_correct = 0
                         num_incorrect = 0
                         print('-------------------------')
                         for found_obj in objs:
-                            key = found_obj[1] + '-' + found_obj[0]
+
+                            global_pos = last_frame_transf_mat @ np.append(found_obj[2].detach().numpy()[0], 1.0)
+
+                            key = found_obj[1] + '-' + found_obj[0] #
+                            print(str(global_pos))
                             if key in s_objs:
                                 print("Found:", key)
                                 num_correct += 1

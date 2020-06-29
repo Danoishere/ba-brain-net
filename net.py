@@ -319,7 +319,7 @@ class ObjCountNet(nn.Module):
 
         objs = []
         for tpl in zip(l_done,l_col, l_shape, l_pos):
-            key = (tpl[1],tpl[2])
+            key = (tpl[1],tpl[2], tpl[3])
             objs.append(key)
             #if key not in objs:
             #    objs[key] = tpl
