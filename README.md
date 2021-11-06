@@ -6,4 +6,4 @@ Check out the following branches:
 - cnn-plus-rnn-version: CNN + RNN (best performing) uses LSTM to aggregate information over multiple timesteps
 - convlstm-version-new: ConvLSTM version that also aggregates data over timesteps
 
-The finished version of the thesis will be added here soon :)
+[Download PDF](https://github.com/Danoishere/ba-brain-net/raw/master/ba20_toff_01_ralph_dano_final.pdf)
